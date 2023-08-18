@@ -2,7 +2,6 @@ def CompanyEntity(company) -> dict:
     return {
         "id": str(company["_id"]),
         "name": company["name"],
-        "db": company["db"],
         "website": company["website"],
         "workerFields": company["workerFields"],
         "customerFields": company["customerFields"],

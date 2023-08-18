@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from middlewares.error_handler import ErrorHandler
 from routers.users import users
 from routers.companies import companies
@@ -13,6 +14,14 @@ from routers.workers import workers
 from routers.websocket import ws
 
 app = FastAPI()
+# Allow CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 app.title = "Harmony API"
 app.version = "0.0.1"

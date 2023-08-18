@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import JSONResponse
 from db.client import db_client
 from models.company import Convention
-from utils.auth import decodeAccessToken, validateRoles
+from utils.auth import decodeAccessToken
+from utils.roles import validateRoles
+from utils.errorsResponses import errors
 from services.users import UsersServices
 from services.conventions import ConventionsServices
 from services.websocket import manager
@@ -18,45 +20,39 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 async def addConvention(convention: Convention, token: str = Depends(oauth2_scheme)):
     token = decodeAccessToken(token)
     if token == False:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired.")
-    if not validateRoles(token["roles"], ["handle_convention"]):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise errors["Token expired"]
+    if not validateRoles(token["roles"], ["admin"], []):
+        raise errors["Unauthorized"]
     user = UsersServices(db).getByEmail(token["email"])
     result = ConventionsServices(db).addConvention(user["company"], convention)
-    if result:
-        message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
-        await manager.broadcast(message)
-        return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error adding convention.")
+    message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
+    await manager.broadcast(message)
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
 # update a convention
 @conventions.put(path="/{conventionId}", summary="Update a convention", description="Update a convention from a company", status_code=status.HTTP_200_OK)
 async def updateConvention(conventionId: str, convention: Convention, token: str = Depends(oauth2_scheme)):
     token = decodeAccessToken(token)
     if token == False:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired.")
-    if not validateRoles(token["roles"], ["handle_convention"]):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise errors["Token expired"]
+    if not validateRoles(token["roles"], ["admin"], []):
+        raise errors["Unauthorized"]
     user = UsersServices(db).getByEmail(token["email"])
     result = ConventionsServices(db).updateConvention(user["company"], conventionId, convention)
-    if result:
-        message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
-        await manager.broadcast(message)
-        return JSONResponse(status_code=status.HTTP_200_OK, content=result)
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error updating convention.")
+    message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
+    await manager.broadcast(message)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
 # delete a convention
 @conventions.delete(path="/{conventionId}", summary="Delete a convention", description="Delete a convention from a company", status_code=status.HTTP_200_OK)
 async def deleteConvention(conventionId: str, token: str = Depends(oauth2_scheme)):
     token = decodeAccessToken(token)
     if token == False:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired.")
-    if not validateRoles(token["roles"], ["handle_convention"]):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise errors["Token expired"] 
+    if not validateRoles(token["roles"], ["admin"], []):
+        raise errors["Unauthorized"]
     user = UsersServices(db).getByEmail(token["email"])
     result = ConventionsServices(db).deleteConvention(user["company"], conventionId)
-    if result:
-        message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
-        await manager.broadcast(message)
-        return JSONResponse(status_code=status.HTTP_200_OK, content=result)
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error deleting convention.")
+    message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
+    await manager.broadcast(message)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=result)

@@ -12,6 +12,7 @@ class User(BaseModel):
     password: str
     company: str
     customers: List[str]
+    workers: List[str]
     roles: List[str]
     active: bool = True
 
@@ -22,10 +23,6 @@ class Login(BaseModel):
 class UpdateUser(BaseModel):
     userName: str
     email: str
-    active: bool = True
-    
-class UpdateUserRoles(BaseModel):
-    roles: List[str]
-    
-class UpdateUserCustomers(BaseModel):
     customers: List[str]
+    workers: List[str]
+    roles: List[str]
