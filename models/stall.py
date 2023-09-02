@@ -11,9 +11,8 @@ class StallWorker(BaseModel):
     sequence: str #sequence aplied to the worker
     index: int #first step
     jump: int #days jumped
-    tag: str #tag
     mode: str #projection or execution
-    userName: str = None
+    createdBy: str = None
     updatedBy: str = None
     createdAt: str = None
     updatedAt: str = None
@@ -22,12 +21,14 @@ class Stall(BaseModel):
     id: str = None
     name: str
     description: str
-    ays: int
-    place: str
-    monthAndYear: str
+    ays: str
+    branch: str
+    month:str
+    year:str
     customer: str
     customerName: str
     workers: List[StallWorker]
+    stage: int
     createdBy: str = None
     updatedBy: str = None
     createdAt: str = None
@@ -36,8 +37,9 @@ class Stall(BaseModel):
 class UpdateStall(BaseModel):
     name: str
     description: str
-    ays: int
-    place: str
+    ays: str
+    branch: str
+    stage: int
     
 class UpdateStallWorker(BaseModel):
     id: str
@@ -49,6 +51,12 @@ class UpdateStallWorker(BaseModel):
     jump: int
     tag: str
     mode: str
+
+
+class GetStalls(BaseModel):
+    months: List[str]
+    years: List[str]
+    customerId: str = None
     
 class StallsAndShifts(BaseModel):
     stalls: List[Stall]

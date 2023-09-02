@@ -1,121 +1,72 @@
 import datetime
 import pytz
-from fastapi import HTTPException, status
 from pymongo.database import Database
-from models.shift import Shift
-from schemas.shift import ShiftEntity
+from pymongo import UpdateOne
+from models.shift import Shift, UpdateShift
 from schemas.user import UserEntity
 from bson.objectid import ObjectId
+from utils.errorsResponses import errors
 from typing import List
 
 class ShiftsServices():
     def __init__(self, db: Database) -> None:
         self.db = db
         
-    def createShifts(self, company: str, shifts: List[Shift], user: UserEntity) -> list:
-        shifts = [dict(shift) for shift in shifts]
-        for shift in shifts:
-            del shift["id"]
-            shift["company"] = company
-            shift["userName"] = user["userName"]
-            shift["updatedBy"] = user["userName"]
-            shift["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
-            shift["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+    def createShifts(self, company: str, shifts: list, user: UserEntity) -> List[Shift]:
         try:
+            shifts = [dict(shift) for shift in shifts]
+            for shift in shifts:
+                shift["company"] = company
+                shift["createdBy"] = user["userName"]
+                shift["updatedBy"] = user["userName"]
+                shift["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+                shift["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
             shifts = self.db.shifts.insert_many(shifts)
             shifts = self.db.shifts.find({"_id": {"$in": shifts.inserted_ids}})
-            return [ShiftEntity(shift) for shift in shifts]
-        except:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error creating shifts.")
+            return shifts or []
+        except Exception as e:
+            raise errors["Creation error"] from e
         
-    def findShiftsByStall(self, company: str, stall: str) -> list:
-        shifts = self.db.shifts.find({"company": company, "stall": stall})
-        if shifts:
-            return [ShiftEntity(shift) for shift in shifts]
-        return None
-
-    def replaceShifts(self, company: str, stall: str, shifts: List[Shift], user: UserEntity) -> list:
-        shifts = [dict(shift) for shift in shifts]
-        for shift in shifts:
-            del shift["id"]
-            shift["company"] = company
-            shift["userName"] = user["userName"]
-            shift["updatedBy"] = user["userName"]
-            shift["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
-            shift["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+    def findShiftsByStall(self, company: str, stallsIds: List[str], customer: str, customers: List[str]) -> List[Shift]:
         try:
-            for shift in shifts:
-                self.db.shifts.delete_one({"company": company, "stall": stall, "day": shift["day"], "worker": shift["worker"], "customer": shift["customer"]})
-            shifts = self.db.shifts.insert_many(shifts)
-            shifts = self.db.shifts.find({"_id": {"$in": shifts.inserted_ids}})
-            return [ShiftEntity(shift) for shift in shifts]
-        except:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error creating shifts.")
+            stallShifts = self.db.shifts.find({"company": company, "stall": {"$in": stallsIds}})
+            if len(customers) == 0:
+                customerShifts = self.db.shifts.find({"company": company, "customer": customer})
+                shifts = list(stallShifts) + list(customerShifts)
+                return shifts or []
+            if len(customers) > 0:
+                customersShifts = self.db.shifts.find({"company": company, "customer": {"$in": customers}})
+                shifts = list(stallShifts) + list(customersShifts)
+                return shifts or []
+        except Exception as e:
+            raise errors["Read error"] from e
         
-    def deactivateShift(self, company: str, id: str, user: UserEntity) -> ShiftEntity:
-        shift = self.db.shifts.find_one({"_id": ObjectId(id)})
-        if not shift:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error deleting shift.")
-        shift = dict(shift)
-        if shift["company"] != company:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized.")
-        shift["active"] = False
-        shift["updatedBy"] = user["userName"]
-        shift["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+    def updateShifts(self, company: str, shifts: list, user: UserEntity) -> List[Shift]:
         try:
-            self.db.shifts.update_one({"_id": ObjectId(id)}, {"$set": shift})
-        except:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error deleting shift.")
-        return ShiftEntity(shift)
-    
-    def deactivateShifts(self, company: str, stall: str, user: UserEntity) -> list:
-        shifts = self.db.shifts.find({"company": company, "stall": stall})
-        if not shifts:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error deleting shifts.")
-        shifts = [dict(shift) for shift in shifts]
-        shiftsDeactivated = []
-        try:
+            shifts = [dict(shift) for shift in shifts]  # Convert shifts to dict
+            ids = [ObjectId(shift["id"]) for shift in shifts]  # Get ids from shifts
+            update_operations = []
             for shift in shifts:
-                self.deactivateShift(company, str(shift["_id"]), user)
-                shiftsDeactivated.append(shift)
-        except:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error deleting shifts.")
-        return [ShiftEntity(shift) for shift in shiftsDeactivated]
+                updated_shift = dict(shift)
+                updated_shift["updatedBy"] = user["userName"]
+                updated_shift["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+                del updated_shift["id"]  # Remove id from the updated_shift
+                update_operations.append(UpdateOne({"_id": ObjectId(shift["id"])}, {"$set": updated_shift}))
+            self.db.shifts.bulk_write(update_operations)
+                
+            shifts = self.db.shifts.find({"company": company, "_id": {"$in": ids}})
+            return shifts
+        except Exception as e:
+            print(e)
+            raise errors["Update error"] from e
         
     
-    def deleteShift(self, company: str, id: str) -> ShiftEntity:
-        shift = self.db.shifts.find_one({"_id": ObjectId(id)})
-        if not shift:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error deleting shift.")
-        shift = dict(shift)
-        if shift["company"] != company:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized.")
+    def deleteShifts(self, company: str, stallId: str, ids: List[str]) -> List[Shift]:
         try:
-            self.db.shifts.delete_one({"_id": ObjectId(id)})
-        except:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error deleting shift.")
-        return ShiftEntity(shift)
-    
-    def deleteShifts(self, company: str, stall: str) -> list:
-        shifts = self.db.shifts.find({"company": company, "stall": stall})
-        if not shifts:
-            return None
-        shifts = [dict(shift) for shift in shifts]
-        try:
-            for shift in shifts:
-                self.deleteShift(company, str(shift["_id"]))
-        except:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error deleting shifts.")
-        return [ShiftEntity(shift) for shift in shifts]
-
-    def deleteShiftsByWorkerAndStall(self, company: str, worker: str, stall: str) -> list:
-        shifts = self.db.shifts.find({"company": company, "worker": worker, "stall": stall})
-        if not shifts:
-            return None
-        shifts = [dict(shift) for shift in shifts]
-        try:
-            for shift in shifts:
-                self.deleteShift(company, str(shift["_id"]))
-        except:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error deleting shifts.")
-        return [ShiftEntity(shift) for shift in shifts]
+            shifts = self.db.shifts.find({"company": company, "stall": stallId, "_id": {"$in": [ObjectId(id) for id in ids]}})
+            if not shifts:
+                return errors["Deletion error"]
+            shifts = self.db.shifts.delete_many({"company": company, "stall": stallId, "_id": {"$in": [ObjectId(id) for id in ids]}})
+            return shifts or []
+        except Exception as e:
+            raise errors["Deletion error"] from e

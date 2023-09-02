@@ -1,6 +1,7 @@
 def CompanyEntity(company) -> dict:
     return {
         "id": str(company["_id"]),
+        "db": company["db"],
         "name": company["name"],
         "website": company["website"],
         "workerFields": company["workerFields"],
@@ -14,3 +15,6 @@ def CompanyEntity(company) -> dict:
         "logo": company["logo"],
         "active": company["active"],
     }
+    
+def CompanyEntityList(companies) -> list:
+    return [CompanyEntity(company) for company in companies]

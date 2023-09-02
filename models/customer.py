@@ -1,6 +1,14 @@
 from pydantic import BaseModel
 from typing import List
-from .company import Field
+
+class Field(BaseModel):
+    id: str
+    name: str
+    type: str
+    size: int
+    value: str
+    options: List[str]
+    required: bool
 
 class Customer(BaseModel):
     id: str = None
@@ -12,6 +20,7 @@ class Customer(BaseModel):
     address: str
     fields: List[Field]
     tags: List[str]
+    branches: List[str]
     company: str = None
     active: bool = True
     userName: str = None
@@ -28,4 +37,6 @@ class UpdateCustomer(BaseModel):
     address: str
     fields: List[Field]
     tags: List[str]
+    branches: List[str]
     active: bool = True
+    

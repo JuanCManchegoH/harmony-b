@@ -1,6 +1,14 @@
 from pydantic import BaseModel
 from typing import List
-from .company import Field
+
+class Field(BaseModel):
+    id: str
+    name: str
+    type: str
+    size: int
+    value: str
+    options: List[str]
+    required: bool
 
 class Worker(BaseModel):
     id: str = None

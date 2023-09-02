@@ -9,6 +9,7 @@ def CustomerEntity(customer) -> dict:
         "address": customer["address"],
         "fields": customer["fields"],
         "tags": customer["tags"],
+        "branches": customer["branches"],
         "company": customer["company"],
         "active": customer["active"],
         "userName": customer["userName"],
@@ -16,3 +17,6 @@ def CustomerEntity(customer) -> dict:
         "createdAt": customer["createdAt"],
         "updatedAt": customer["updatedAt"]
     }
+    
+def CustomerEntityList(customers) -> list:
+    return [CustomerEntity(customer) for customer in customers]

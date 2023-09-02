@@ -1,8 +1,16 @@
-def validateRoles(user_roles, required_roles, allowed_roles):
-    if "super_admin" in user_roles:
+from typing import List
+from .errorsResponses import errors
+
+def required_roles(roles: List[str], required_roles: List[str]) -> bool:
+    if "super_admin" in roles:
         return True
-    has_required_roles = all(role in user_roles for role in required_roles)
-    has_allowed_roles = any(role in user_roles for role in allowed_roles)
-    if len(required_roles) > 0:
-        return has_required_roles
-    return has_allowed_roles
+    acces = set(required_roles).issubset(set(roles))
+    if not acces:
+        raise errors["Unauthorized"]
+
+def allowed_roles(roles: List[str], allowed_roles: List[str]) -> bool:
+    if "super_admin" in roles:
+        return True
+    acces = set(allowed_roles).intersection(set(roles))
+    if not acces:
+        raise errors["Unauthorized"]

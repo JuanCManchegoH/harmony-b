@@ -1,44 +1,40 @@
-from models.company import Field
-from schemas.company import CompanyEntity
+from .companies import CompaniesServices
+from models.company import Field, Company
+from pymongo.database import Database
 from bson import ObjectId
 from utils.errorsResponses import errors
 
 class WFieldsServices():
-    def __init__(self, db) -> None:
+    def __init__(self, db: Database) -> None:
         self.db = db
     
-    def addWField(self, id: str, field: Field) -> CompanyEntity:
-        field = dict(field)
-        field["id"] = str(ObjectId())
-        if self.db.companies.find_one({"_id": ObjectId(id), "workerFields.name": field["name"]}):
-            raise errors["Creation error"]
-        if not self.db.companies.find_one({"_id": ObjectId(id)}):
-            raise errors["Creation error"]
+    def addWField(self, id: str, field: Field) -> Company:
         try:
+            field = dict(field)
+            field["id"] = str(ObjectId())
+            if self.db.companies.find_one({"_id": ObjectId(id), "workerFields.name": field["name"]}):
+                raise errors["Creation error"]
             self.db.companies.update_one({"_id": ObjectId(id)}, {"$push": {"workerFields": field}})
-            company = self.db.companies.find_one({"_id": ObjectId(id)})
-            return CompanyEntity(company)
-        except:
-            raise errors["Creation error"]
+            company = CompaniesServices(self.db).getCompany(id)
+            return company
+        except Exception as e:
+            raise errors["Creation error"] from e
     
-    def updateWField(self, id: str, fieldId: str, field: Field) -> CompanyEntity:
-        field = dict(field)
-        field["id"] = fieldId
-        if not self.db.companies.find_one({"_id": ObjectId(id), "workerFields.id": fieldId}):
-            raise errors["Update error"]
+    def updateWField(self, id: str, fieldId: str, field: Field) -> Company:
         try:  
+            field = dict(field)
+            field["id"] = fieldId
             self.db.companies.update_one({"_id": ObjectId(id), "workerFields.id": fieldId}, {"$set": {"workerFields.$": field}})
-            company = self.db.companies.find_one({"_id": ObjectId(id)})
-            return CompanyEntity(company)
-        except:
-            raise errors["Update error"]
+            company = CompaniesServices(self.db).getCompany(id)
+            return company
+        except Exception as e:
+            raise errors["Update error"] from e
     
-    def deleteWField(self, id: str, fieldId: str) -> CompanyEntity:
-        if not self.db.companies.find_one({"_id": ObjectId(id), "workerFields.id": fieldId}):
-            raise errors["Deletion error"]
+    def deleteWField(self, id: str, fieldId: str) -> Company:
         try: 
             self.db.companies.update_one({"_id": ObjectId(id)}, {"$pull": {"workerFields": {"id": fieldId}}})
-            company = self.db.companies.find_one({"_id": ObjectId(id)})
-            return CompanyEntity(company)
-        except:
-            raise errors["Deletion error"]
+            company = CompaniesServices(self.db).getCompany(id)
+            return company
+        except Exception as e:
+            raise errors["Deletion error"] from e
+        

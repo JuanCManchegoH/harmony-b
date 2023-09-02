@@ -11,10 +11,11 @@ from routers.sequences import sequences
 from routers.tags import tags
 from routers.customers import customers
 from routers.workers import workers
+from routers.stalls import stalls
+from routers.shifts import shifts
 from routers.websocket import ws
 
 app = FastAPI()
-# Allow CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,7 +25,7 @@ app.add_middleware(
 )
 
 app.title = "Harmony API"
-app.version = "0.0.1"
+app.version = "0.0.17"
 
 app.add_middleware(ErrorHandler)
 
@@ -42,4 +43,6 @@ app.include_router(sequences)
 app.include_router(tags)
 app.include_router(customers)
 app.include_router(workers)
+app.include_router(stalls)
+app.include_router(shifts)
 app.include_router(ws)

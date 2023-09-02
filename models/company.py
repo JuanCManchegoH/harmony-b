@@ -24,6 +24,7 @@ class Convention(BaseModel):
     name: str
     color: str
     abbreviation: str
+    keep: bool
 
 # paso   
 class Step(BaseModel):

@@ -1,57 +1,59 @@
 from pymongo.database import Database
 from models.company import Company, UpdateCompany
-from schemas.company import CompanyEntity
 from bson.objectid import ObjectId
 from utils.errorsResponses import errors
-from typing import List
+from typing import Optional, List
 
 class CompaniesServices(): 
     def __init__(self, db: Database) -> None:
         self.db = db
     
-    def createCompany(self, company: Company) -> CompanyEntity:
-        company = dict(company)
-        del company["id"]
-        if self.db.companies.find_one({"db": company["db"]}):
-            raise errors["Creation error"]
+    def getCompany(self, id: str) -> Optional[Company]:
         try:
-            company = self.db.companies.insert_one(company)
-            company = self.db.companies.find_one({"_id": company.inserted_id})
-            return CompanyEntity(company)
-        except:
+            company = self.db.companies.find_one({"_id": ObjectId(id)})
+            return company or None
+        except Exception as e:
+            raise errors["Read error"] from e
+    
+    def createCompany(self, company: Company) -> Company:
+        try:
+            company = dict(company)
+            del company["id"]
+            if self.db.companies.find_one({"db": company["db"]}):
+                raise errors["Creation error"]
+            insertion_result = self.db.companies.insert_one(company)
+            created_company = self.db.companies.find_one({"_id": insertion_result.inserted_id})
+            return created_company
+        except Exception as e:
             raise errors["Creation error"]
         
-    def findCompany(self, id: str) -> CompanyEntity:
-        company = self.db.companies.find_one({"_id": ObjectId(id)})
-        if company:
-            return CompanyEntity(company)
-        return CompanyEntity({})
-    
-    def findAllCompanies(self) -> List[CompanyEntity]:
-        companies = self.db.companies.find()
-        if companies:
-            return [CompanyEntity(company) for company in companies]
-        return []
-    
-    def updateCompany(self, id: str, company: UpdateCompany) -> CompanyEntity:
-        company = dict(company)
-        if company["db"]:
-            if self.db.companies.find_one({"db": company["db"]}):
-                raise errors["Update error"]
-        del company["id"]
+    def findAllCompanies(self) -> List[Company]:
         try:
+            companies = self.db.companies.find()
+            return companies or []
+        except Exception as e:
+            raise errors["Read error"] from e
+        
+    
+    def updateCompany(self, id: str, company: UpdateCompany) -> Company:
+        try:
+            company = dict(company)
+            if company["db"]:
+                if self.db.companies.find_one({"db": company["db"]}):
+                    raise errors["Update error"]
+            del company["id"]
             self.db.companies.update_one({"_id": ObjectId(id)}, {"$set": company})
-            company = self.db.companies.find_one({"_id": ObjectId(id)})
-            return CompanyEntity(company)
+            company = self.getCompany(id)
+            return company
         except:
             raise errors["Update error"]
     
-    def deleteCompany(self, id: str) -> CompanyEntity:
+    def deleteCompany(self, id: str) -> Company:
         try:
-            company = self.db.companies.find_one({"_id": ObjectId(id)})
+            company = self.getCompany(id)
             if not company:
                 raise errors["Deletion error"]
             self.db.companies.delete_one({"_id": ObjectId(id)})
-            return CompanyEntity(company)
+            return company
         except :
             raise errors["Deletion error"]

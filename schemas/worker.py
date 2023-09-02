@@ -15,3 +15,6 @@ def WorkerEntity(worker) -> dict:
         "createdAt": worker["createdAt"],
         "updatedAt": worker["updatedAt"]
     }
+
+def WorkerEntityList(workers) -> list:
+    return [WorkerEntity(worker) for worker in workers]

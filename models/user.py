@@ -1,9 +1,6 @@
 from pydantic import BaseModel
 from typing import List
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+from schemas.company import CompanyEntity
 
 class User(BaseModel):
     id: str = None
@@ -11,6 +8,17 @@ class User(BaseModel):
     email: str
     password: str
     company: str
+    customers: List[str]
+    workers: List[str]
+    roles: List[str]
+    active: bool = True
+    
+class Profile(BaseModel):
+    id: str = None
+    userName: str
+    email: str
+    password: str
+    company: CompanyEntity
     customers: List[str]
     workers: List[str]
     roles: List[str]
