@@ -19,8 +19,8 @@ class ShiftsServices():
                 shift["company"] = company
                 shift["createdBy"] = user["userName"]
                 shift["updatedBy"] = user["userName"]
-                shift["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
-                shift["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+                shift["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+                shift["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
             shifts = self.db.shifts.insert_many(shifts)
             shifts = self.db.shifts.find({"_id": {"$in": shifts.inserted_ids}})
             return shifts or []
@@ -49,7 +49,7 @@ class ShiftsServices():
             for shift in shifts:
                 updated_shift = dict(shift)
                 updated_shift["updatedBy"] = user["userName"]
-                updated_shift["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+                updated_shift["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
                 del updated_shift["id"]  # Remove id from the updated_shift
                 update_operations.append(UpdateOne({"_id": ObjectId(shift["id"])}, {"$set": updated_shift}))
             self.db.shifts.bulk_write(update_operations)
@@ -66,7 +66,7 @@ class ShiftsServices():
             shifts = self.db.shifts.find({"company": company, "stall": stallId, "_id": {"$in": [ObjectId(id) for id in ids]}})
             if not shifts:
                 return errors["Deletion error"]
-            shifts = self.db.shifts.delete_many({"company": company, "stall": stallId, "_id": {"$in": [ObjectId(id) for id in ids]}})
+            self.db.shifts.delete_many({"company": company, "stall": stallId, "_id": {"$in": [ObjectId(id) for id in ids]}})
             return shifts or []
         except Exception as e:
             raise errors["Deletion error"] from e

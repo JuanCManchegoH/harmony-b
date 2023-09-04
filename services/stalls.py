@@ -1,7 +1,7 @@
 import datetime
 import pytz
 from pymongo.database import Database
-from models.stall import Stall, UpdateStall, StallWorker, StallsAndShifts
+from models.stall import Stall, UpdateStall, StallWorker, StallsAndShifts, UpdateStallWorker
 from schemas.user import UserEntity
 from bson.objectid import ObjectId
 from .shifts import ShiftsServices
@@ -18,8 +18,8 @@ class StallsServices():
             del stall["id"]
             stall["createdBy"] = user["userName"]
             stall["updatedBy"] = user["userName"]
-            stall["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
-            stall["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+            stall["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+            stall["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
             stall = self.db.stalls.insert_one(stall)
             stall = self.db.stalls.find_one({"_id": stall.inserted_id})
             return stall or {}
@@ -55,7 +55,7 @@ class StallsServices():
                 return errors["Update error"]
             stall = dict(stall)
             data = dict(data)
-            data["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+            data["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
             data["updatedBy"] = user["userName"]
             self.db.stalls.update_one({"_id": ObjectId(id)}, {"$set": data})
             stall = self.db.stalls.find_one({"_id": ObjectId(id)})
@@ -81,12 +81,35 @@ class StallsServices():
             worker = dict(worker)
             worker["createdBy"] = user["userName"]
             worker["updatedBy"] = user["userName"]
-            worker["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
-            worker["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+            worker["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+            worker["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
             stall = self.db.stalls.find_one({"_id": ObjectId(id)})
             if not stall:
                 return errors["Update error"]
             self.db.stalls.update_one({"_id": ObjectId(id)}, {"$push": {"workers": worker}})
+            stall = self.db.stalls.find_one({"_id": ObjectId(id)})
+            return stall or {}
+        except Exception as e:
+            raise errors["Update error"] from e
+        
+    def updateStallWorker(self, id: str, workerId: str, data: UpdateStallWorker, user: UserEntity) -> Stall:
+        try:
+            update_data = {
+                "workers.$.sequence": data["sequence"],
+                "workers.$.index": data["index"],
+                "workers.$.jump": data["jump"],
+                "workers.$.updatedAt": datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M"),
+                "workers.$.updatedBy": user["userName"]
+            }
+
+            result = self.db.stalls.update_one(
+                {"_id": ObjectId(id), "workers.id": workerId},
+                {"$set": update_data}
+            )
+
+            if result.modified_count == 0:
+                return errors["Update error"]
+
             stall = self.db.stalls.find_one({"_id": ObjectId(id)})
             return stall or {}
         except Exception as e:

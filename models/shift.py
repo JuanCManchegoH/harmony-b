@@ -1,6 +1,8 @@
 from typing import List
 from pydantic import BaseModel
 
+from models.company import Step
+
 class Shift(BaseModel):
     id: str = None
     day: str
@@ -9,12 +11,15 @@ class Shift(BaseModel):
     color: str
     abbreviation: str
     description: str
-    mode: str
+    sequence: str
+    position: str
     type: str
     active: bool
     keep: bool
     worker: str
+    workerName: str
     stall: str
+    stallName: str
     company: str = None
     createdBy: str = None
     updatedBy: str = None
@@ -28,7 +33,6 @@ class UpdateShift(BaseModel):
     color: str
     abbreviation: str
     description: str
-    mode: str
     type: str
     active: bool
     keep: bool
@@ -40,13 +44,23 @@ class CreateShift(BaseModel):
     color: str
     abbreviation: str
     description: str
-    mode: str
+    sequence: str
+    position: str
     type: str
     active: bool
     keep: bool
     worker: str
+    workerName: str
     stall: str
-
+    stallName: str
+    
+class AppliedSequence(BaseModel):
+    stall: str
+    worker: str
+    sequence: List[Step]
+    index: int
+    jump: int
+    
 class CreateShifts(BaseModel):
     shifts: List[CreateShift]
     
@@ -56,3 +70,5 @@ class DeleteShifts(BaseModel):
 class CreateAndUpdateShifts(BaseModel):
     create: List[CreateShift] = None
     update: List[UpdateShift] = None
+    appliedSequence: AppliedSequence = None
+    

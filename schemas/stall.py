@@ -13,6 +13,7 @@ def StallEntity(stall) -> dict:
         "customerName": stall["customerName"],
         "workers": stall["workers"],
         "stage": stall["stage"],
+        "tag": stall["tag"],
         "createdBy": stall["createdBy"],
         "updatedBy": stall["updatedBy"],
         "createdAt": stall["createdAt"],

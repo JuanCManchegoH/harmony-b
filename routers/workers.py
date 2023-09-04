@@ -45,7 +45,7 @@ async def findWorkers(search: str, limit: int, skip: int, token: str = Depends(o
     user = UsersServices(harmony).getByEmail(token["email"])
     company = CompaniesServices(harmony).getCompany(user["company"])
     companyDb = db_client[company["db"]]
-    result = WorkersServices(companyDb).findWorkersByNameOrIdentification(user["company"], search, limit, skip)
+    result = WorkersServices(companyDb).findWorkersByNameOrIdentification(user["company"], search, limit, skip, user["workers"])
     result = WorkerEntityList(result)
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
@@ -78,7 +78,7 @@ async def deleteWorker(id: str, token: str = Depends(oauth2_scheme)) -> JSONResp
     user = UsersServices(harmony).getByEmail(token["email"])
     company = CompaniesServices(harmony).getCompany(user["company"])
     companyDb = db_client[company["db"]]
-    result = WorkersServices(companyDb).deleteWorker(user["company"], id)
+    result = WorkersServices(companyDb).deleteWorker(user["company"], id, user["workers"])
     result = WorkerEntity(result)
     # Websocket
     message = WebsocketResponse(event="worker_deleted", data=result, userName=user["userName"], company=user["company"])

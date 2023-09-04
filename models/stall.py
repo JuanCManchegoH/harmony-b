@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import List
+from models.company import Step
 
 from models.shift import Shift
 
@@ -8,10 +9,9 @@ class StallWorker(BaseModel):
     name: str #Worker name
     identification: str #Worker identification
     position: str #Worker position
-    sequence: str #sequence aplied to the worker
+    sequence: List[Step]
     index: int #first step
     jump: int #days jumped
-    mode: str #projection or execution
     createdBy: str = None
     updatedBy: str = None
     createdAt: str = None
@@ -29,6 +29,7 @@ class Stall(BaseModel):
     customerName: str
     workers: List[StallWorker]
     stage: int
+    tag: str
     createdBy: str = None
     updatedBy: str = None
     createdAt: str = None
@@ -40,18 +41,12 @@ class UpdateStall(BaseModel):
     ays: str
     branch: str
     stage: int
+    tag: str
     
 class UpdateStallWorker(BaseModel):
-    id: str
-    name: str
-    identification: str
-    position: str
-    sequence: str
+    sequence: List[Step]
     index: int
     jump: int
-    tag: str
-    mode: str
-
 
 class GetStalls(BaseModel):
     months: List[str]

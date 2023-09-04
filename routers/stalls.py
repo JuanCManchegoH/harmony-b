@@ -108,8 +108,8 @@ async def addStallWorker(id: str, worker: StallWorker, token: str = Depends(oaut
     # Return
     return result
 
-@stalls.delete(path="/removeWorker/{id}/{workerId}", summary="Remove a worker from a stall", description="This endpoint removes a worker from a stall in the database and returns the stall object.", status_code=200)
-async def removeWorker(id: str, workerId: str, token: str = Depends(oauth2_scheme)):
+@stalls.post(path="/removeWorker/{id}/{workerId}", summary="Remove a worker from a stall", description="This endpoint removes a worker from a stall in the database and returns the stall object.", status_code=200)
+async def removeWorker(id: str, workerId: str, data: DeleteShifts, token: str = Depends(oauth2_scheme)):
     # Validations
     token = decodeAccessToken(token)
     allowed_roles(token["roles"], ["handle_stalls", "admin"])
@@ -117,7 +117,7 @@ async def removeWorker(id: str, workerId: str, token: str = Depends(oauth2_schem
     user = UsersServices(harmony).getByEmail(token["email"])
     company = CompaniesServices(harmony).getCompany(user["company"])
     companyDb = db_client[company["db"]]
-    result = StallsServices(companyDb).removeWorker(user["company"], id, workerId)
+    result = StallsServices(companyDb).removeWorker(user["company"], id, workerId, data.shifts)
     result = StallEntity(result)
     # Websocket
     message = WebsocketResponse(event="stall_updated", data=result, userName=user["userName"], company=user["company"])

@@ -20,8 +20,8 @@ class WorkersServices():
                 raise errors["Creation error"]
             worker["userName"] = user["userName"]
             worker["updatedBy"] = user["userName"]
-            worker["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
-            worker["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+            worker["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+            worker["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
             fields = []
             for field in worker["fields"]:
                 fields.append(dict(field))
@@ -32,9 +32,12 @@ class WorkersServices():
         except Exception as e:
             raise errors["Creation error"] from e
         
-    def findWorkersByNameOrIdentification(self, company: str, search: str, limit: int, skip: int) -> List[Worker]:
+    def findWorkersByNameOrIdentification(self, company: str, search: str, limit: int, skip: int, userTags: list) -> List[Worker]:
         try:
-            workers = self.db.workers.find({"company": company, "$or": [{"name": {"$regex": search, "$options": "i"}}, {"identification": {"$regex": search, "$options": "i"}}]}).limit(limit).skip(skip)
+            if "all" in userTags:
+                workers = self.db.workers.find({"company": company, "$or": [{"name": {"$regex": search, "$options": "i"}}, {"identification": {"$regex": search, "$options": "i"}}]}).limit(limit).skip(skip)
+                return workers or []
+            workers = self.db.workers.find({"company": company, "tags": {"$in": userTags}, "$or": [{"name": {"$regex": search, "$options": "i"}}, {"identification": {"$regex": search, "$options": "i"}}]}).limit(limit).skip(skip)
             return workers or []
         except Exception as e:
             raise errors["Read error"] from e
@@ -47,12 +50,15 @@ class WorkersServices():
             if worker["company"] != company:
                 raise errors["Unauthorized"]
             worker = dict(worker)
+            userTags = user["workers"]
+            if not set(worker["tags"]).intersection(userTags) and "all" not in userTags:
+                raise errors["Update error"]
             data = dict(data)
             fields = []
             for field in data["fields"]:
                 fields.append(dict(field))
             data["fields"] = fields
-            data["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%Y-%m-%d")
+            data["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
             data["updatedBy"] = user["userName"]
             self.db.workers.update_one({"_id": ObjectId(id)}, {"$set": data})
             worker = self.db.workers.find_one({"_id": ObjectId(id)})
@@ -60,12 +66,14 @@ class WorkersServices():
         except Exception as e:
             raise errors["Update error"] from e
     
-    def deleteWorker(self, company: str, id: str) -> Worker:
+    def deleteWorker(self, company: str, id: str, userTags: list) -> Worker:
         try:
             worker = self.db.workers.find_one({"_id": ObjectId(id)})
             if not worker:
                 raise errors["Deletion error"]
             worker = dict(worker)
+            if not set(worker["tags"]).intersection(userTags) and "all" not in userTags:
+                raise errors["Unauthorized"]
             if worker["company"] != company:
                 raise errors["Unauthorized"]
             self.db.workers.delete_one({"_id": ObjectId(id)})
