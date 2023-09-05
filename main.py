@@ -33,6 +33,7 @@ app.add_middleware(ErrorHandler)
 async def root():
     return {"message": "Welcome to Harmony API!"}
 
+app.router.redirect_slashes = False
 app.include_router(users)
 app.include_router(companies)
 app.include_router(wfields)
