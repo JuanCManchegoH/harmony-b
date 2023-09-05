@@ -18,7 +18,7 @@ harmony = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # create a worker
-@workers.post(path="/", summary="Create a worker", description="This endpoint creates a worker in the database and returns the worker object.", status_code=201)
+@workers.post(path="", summary="Create a worker", description="This endpoint creates a worker in the database and returns the worker object.", status_code=201)
 async def createWorker(worker: Worker, token: str = Depends(oauth2_scheme)) -> JSONResponse:
     # Validations
     token = decodeAccessToken(token)

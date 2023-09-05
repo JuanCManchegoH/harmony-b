@@ -20,7 +20,7 @@ harmony = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # create and update shifts
-@shifts.put(path="/", summary="Create and update shifts", description="This endpoint creates and updates shifts in the database and returns the shifts object.", status_code=201)
+@shifts.put(path="", summary="Create and update shifts", description="This endpoint creates and updates shifts in the database and returns the shifts object.", status_code=201)
 async def createAndUpdateShifts(shifts: CreateAndUpdateShifts, token: str = Depends(oauth2_scheme)) -> JSONResponse:
     # Validations
     token = decodeAccessToken(token)

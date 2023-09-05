@@ -16,7 +16,7 @@ db = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # add a sequence
-@sequences.post(path="/", summary="Add a sequence", description="Add a sequence to a company", status_code=status.HTTP_201_CREATED)
+@sequences.post(path="", summary="Add a sequence", description="Add a sequence to a company", status_code=status.HTTP_201_CREATED)
 async def addSequence(sequence: Sequence, token: str = Depends(oauth2_scheme)) -> JSONResponse:
     # Validations
     token = decodeAccessToken(token)

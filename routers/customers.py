@@ -18,7 +18,7 @@ harmony = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # create a customer
-@customers.post(path="/", summary="Create a customer", description="This endpoint creates a customer in the database and returns the customer object.", status_code=201)
+@customers.post(path="", summary="Create a customer", description="This endpoint creates a customer in the database and returns the customer object.", status_code=201)
 async def createCustomer(customer: Customer, token: str = Depends(oauth2_scheme)) -> JSONResponse:
     # Validations
     token = decodeAccessToken(token)

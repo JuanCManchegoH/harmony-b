@@ -17,7 +17,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 user_services = UsersServices(db)
 
 # create a user
-@users.post(path="/", summary="Create a user", description="This endpoint creates a user in the database and returns the user object.", status_code=201)
+@users.post(path="", summary="Create a user", description="This endpoint creates a user in the database and returns the user object.", status_code=201)
 async def createUser(new_user: User, token: str = Depends(oauth2_scheme)):
     # Validations
     token = decodeAccessToken(token)

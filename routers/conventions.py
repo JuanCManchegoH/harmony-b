@@ -16,7 +16,7 @@ db = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # add a convention
-@conventions.post(path="/", summary="Add a convention", description="Add a convention to a company", status_code=status.HTTP_201_CREATED)
+@conventions.post(path="", summary="Add a convention", description="Add a convention to a company", status_code=status.HTTP_201_CREATED)
 async def addConvention(convention: Convention, token: str = Depends(oauth2_scheme)) -> JSONResponse:
     # Validations
     token = decodeAccessToken(token)

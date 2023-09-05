@@ -16,7 +16,7 @@ db = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # add a tag
-@tags.post(path="/", summary="Add a tag", description="Add a tag to a company", status_code=status.HTTP_201_CREATED)
+@tags.post(path="", summary="Add a tag", description="Add a tag to a company", status_code=status.HTTP_201_CREATED)
 async def addTag(tag: Tag, token: str = Depends(oauth2_scheme)) -> JSONResponse:
     # Validations
     token = decodeAccessToken(token)

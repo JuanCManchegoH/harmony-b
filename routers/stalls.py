@@ -19,7 +19,7 @@ harmony = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # create a stall
-@stalls.post(path="/", summary="Create a stall", description="This endpoint creates a stall in the database and returns the stall object.", status_code=201)
+@stalls.post(path="", summary="Create a stall", description="This endpoint creates a stall in the database and returns the stall object.", status_code=201)
 async def createStall(stall: Stall, token: str = Depends(oauth2_scheme)) -> JSONResponse:
     # Validations
     token = decodeAccessToken(token)

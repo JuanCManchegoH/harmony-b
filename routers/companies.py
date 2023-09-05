@@ -13,7 +13,7 @@ db = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Create a company
-@companies.post(path="/", summary="Create a company", description="This endpoint creates a company in the database and returns the company object.", status_code=201)
+@companies.post(path="", summary="Create a company", description="This endpoint creates a company in the database and returns the company object.", status_code=201)
 async def createCompany(company: Company, token: str = Depends(oauth2_scheme)):
     # Validations
     token = decodeAccessToken(token)
