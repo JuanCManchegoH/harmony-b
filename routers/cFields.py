@@ -16,7 +16,7 @@ db = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # add a customer field
-@cfields.post(path="/", summary="Add a customer field", description="Add a customer field to a company", status_code=status.HTTP_201_CREATED)
+@cfields.post(path="", summary="Add a customer field", description="Add a customer field to a company", status_code=status.HTTP_201_CREATED)
 async def addCField(field: Field, token: str = Depends(oauth2_scheme)) -> JSONResponse:
     # Validations
     token = decodeAccessToken(token)
