@@ -39,16 +39,13 @@ async def createAndUpdateShifts(shifts: CreateAndUpdateShifts, token: str = Depe
     else:
         updateResult = []
     if shifts.appliedSequence:
-        # data is equal to dict witth shifts.appliedSequence["sequence"], shifts.appliedSequence["index"], shifts.appliedSequence["jump"] without shifts.appliedSequence["stall"]
         appliedSequence = dict(shifts.appliedSequence)
         steps = [dict(step) for step in appliedSequence["sequence"]]
-        print("Here")
         data = {
             "sequence": steps,
             "index": appliedSequence["index"],
             "jump": appliedSequence["jump"]
         }
-        print(steps)
         stall = StallsServices(companyDb).updateStallWorker(appliedSequence["stall"], appliedSequence["worker"], data, user)  
     else:
         stall = {}
@@ -61,19 +58,12 @@ async def createAndUpdateShifts(shifts: CreateAndUpdateShifts, token: str = Depe
     # message = WebsocketResponse(event="shifts_created_and_updated", data=result, userName=user["userName"], company=user["company"])
     # await manager.broadcast(message)
     # Log
-    if len(shifts.create) > 0:
-        create = dict(shifts.create[0])
-        stall = StallsServices(companyDb).findStall(create["stall"])
-    if len(shifts.update) > 0:
-        update = dict(shifts.update[0])
-        stall = StallsServices(companyDb).findStall(update["stall"])
-    stall = dict(stall)
     _ = LogsServices(companyDb).createLog({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
         "type": "Turnos",
-        "message": f"El usuario {user['userName']} ha creado y/o actualizado turnos en el puesto {stall['name']}. Cliente: {stall['customerName']}"
+        "message": f"El usuario {user['userName']} ha creado y/o actualizado turnos"
     })
     # Return
     return result
