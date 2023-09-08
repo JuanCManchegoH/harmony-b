@@ -49,10 +49,11 @@ async def createAndUpdateShifts(shifts: CreateAndUpdateShifts, token: str = Depe
         stall = StallsServices(companyDb).updateStallWorker(appliedSequence["stall"], appliedSequence["worker"], data, user)  
     else:
         stall = {}
+    print(stall)
     result = {
         "created": ShiftsEntity(createResult),
         "updated": ShiftsEntity(updateResult),
-        "stall": StallEntity(stall) if shifts.appliedSequence else None
+        # "stall": StallEntity(stall) if shifts.appliedSequence else None
     }
     # Websocket
     # message = WebsocketResponse(event="shifts_created_and_updated", data=result, userName=user["userName"], company=user["company"])
