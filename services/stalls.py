@@ -26,22 +26,33 @@ class StallsServices():
         except Exception as e:
             raise errors["Creation error"] from e
         
-    def findStalls(self, company: str, months: List[str], years: List[str], customers: List[str]) -> StallsAndShifts:
+    def findStall(self, id: str) -> Stall:
+        try:
+            stall = self.db.stalls.find_one({"_id": ObjectId(id)})
+            return stall or {}
+        except Exception as e:
+            raise errors["Read error"] from e
+        
+    def findStalls(self, company: str, months: List[str], years: List[str]) -> StallsAndShifts:
         try:
             stalls = self.db.stalls.find({"month": {"$in": months}, "year": {"$in": years}})
-            shifts = ShiftsServices(self.db).findShiftsByStall(company, [str(stall["_id"]) for stall in stalls], "", customers)
             stalls = [dict(stall) for stall in stalls]
+            customers = list()
+            for stall in stalls:
+                if stall["customer"] not in customers:
+                    customers.append(stall["customer"])
+            shifts = ShiftsServices(self.db).findShiftsByCustomers(company, [str(stall["_id"]) for stall in stalls], customers)
             shifts = [dict(shift) for shift in shifts]
             result = {"stalls": stalls, "shifts": shifts}
             return result or {}
         except Exception as e:
             raise errors["Read error"] from e
     
-    def finsCustomerStalls(self, company: str, customer: str, months: List[str], years: List[str]) -> StallsAndShifts:
+    def findCustomerStalls(self, company: str, customer: str, months: List[str], years: List[str]) -> StallsAndShifts:
         try:
             stalls = self.db.stalls.find({"customer": customer, "month": {"$in": months}, "year": {"$in": years}})
             stalls = [dict(stall) for stall in stalls]
-            shifts = ShiftsServices(self.db).findShiftsByStall(company, [str(stall["_id"]) for stall in stalls], customer, [])
+            shifts = ShiftsServices(self.db).findShiftsByCustomer(company, [str(stall["_id"]) for stall in stalls], customer)
             shifts = [dict(shift) for shift in shifts]
             result = {"stalls": stalls, "shifts": shifts}
             return result or {}

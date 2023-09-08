@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import JSONResponse
 from db.client import db_client
+from services.companies import CompaniesServices
 from services.users import UsersServices
 from services.conventions import ConventionsServices
 from services.websocket import manager
+from services.logs import LogsServices
 from models.company import Convention
 from models.websocket import WebsocketResponse
 from schemas.company import CompanyEntity
@@ -28,6 +30,16 @@ async def addConvention(convention: Convention, token: str = Depends(oauth2_sche
     # Websocket
     message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    company = CompaniesServices(db).getCompany(user["company"])
+    companyDb = db_client[company["db"]]
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Convenciones",
+        "message": f"El usuario {user['userName']} ha creado una convención"
+    })
     # Return
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
@@ -44,6 +56,16 @@ async def updateConvention(conventionId: str, convention: Convention, token: str
     # Websocket
     message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    company = CompaniesServices(db).getCompany(user["company"])
+    companyDb = db_client[company["db"]]
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Convenciones",
+        "message": f"El usuario {user['userName']} ha actualizado una convención"
+    })
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
@@ -60,5 +82,15 @@ async def deleteConvention(conventionId: str, token: str = Depends(oauth2_scheme
     # Websocket
     message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    company = CompaniesServices(db).getCompany(user["company"])
+    companyDb = db_client[company["db"]]
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Convenciones",
+        "message": f"El usuario {user['userName']} ha eliminado una convención"
+    })
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)

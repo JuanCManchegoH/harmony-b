@@ -8,9 +8,11 @@ from services.users import UsersServices
 from services.companies import CompaniesServices
 from services.stalls import StallsServices
 from services.websocket import manager
+from services.logs import LogsServices
 from models.stall import GetStalls, Stall, StallWorker, UpdateStall
 from models.websocket import WebsocketResponse
 from schemas.stall import StallEntity, StallsAndShifts
+from services.workers import WorkersServices
 from utils.auth import decodeAccessToken
 from utils.roles import allowed_roles
 
@@ -33,10 +35,18 @@ async def createStall(stall: Stall, token: str = Depends(oauth2_scheme)) -> JSON
     # Websocket
     message = WebsocketResponse(event="stall_created", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Puestos",
+        "message": f"El usuario {user['userName']} ha creado el puesto {result['name']}. Cliente: {result['customerName']}"
+    })
     # Return
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
-# find stalls
+# find stalls by customer
 @stalls.post(path="/getByCustomer", summary="Find all stalls", description="This endpoint returns all stalls", status_code=200)
 async def finsCustomerStalls(data: GetStalls, token: str = Depends(oauth2_scheme)) -> JSONResponse:
     # Validations
@@ -46,12 +56,22 @@ async def finsCustomerStalls(data: GetStalls, token: str = Depends(oauth2_scheme
     user = UsersServices(harmony).getByEmail(token["email"])
     company = CompaniesServices(harmony).getCompany(user["company"])
     companyDb = db_client[company["db"]]
-    if data.customerId:
-        result = StallsServices(companyDb).finsCustomerStalls(user["company"], data.customerId, data.months, data.years)
-        result = StallsAndShifts(result["stalls"], result["shifts"])
-    else:
-        result = StallsServices(companyDb).findStalls(user["company"], data.months, data.years)
-        result = StallsAndShifts(result["stalls"], result["shifts"])
+    result = StallsServices(companyDb).findCustomerStalls(user["company"], data.customerId, data.months, data.years)
+    result = StallsAndShifts(result["stalls"], result["shifts"])
+    return JSONResponse(status_code=status.HTTP_200_OK, content=result)
+
+# find stalls by customers
+@stalls.post(path="/getByCustomers", summary="Find all stalls", description="This endpoint returns all stalls", status_code=200)
+async def finsCustomersStalls(data: GetStalls, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    # Validations
+    token = decodeAccessToken(token)
+    allowed_roles(token["roles"], ["read_stalls", "admin"])
+    # Find all stalls
+    user = UsersServices(harmony).getByEmail(token["email"])
+    company = CompaniesServices(harmony).getCompany(user["company"])
+    companyDb = db_client[company["db"]]
+    result = StallsServices(companyDb).findStalls(user["company"], data.months, data.years)
+    result = StallsAndShifts(result["stalls"], result["shifts"])
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
 # update a stall
@@ -69,6 +89,14 @@ async def updateStall(id: str, data: UpdateStall, token: str = Depends(oauth2_sc
     # Websocket
     message = WebsocketResponse(event="stall_updated", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Puestos",
+        "message": f"El usuario {user['userName']} ha actualizado el puesto {result['name']}. Cliente: {result['customerName']}"
+    })
     # Return
     return result
 
@@ -87,6 +115,14 @@ async def deleteStall(id: str, data: DeleteShifts, token: str = Depends(oauth2_s
     # Websocket
     message = WebsocketResponse(event="stall_deleted", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Puestos",
+        "message": f"El usuario {user['userName']} ha eliminado el puesto {result['name']}. Cliente: {result['customerName']}"
+    })
     # Return
     return result
 
@@ -105,6 +141,16 @@ async def addStallWorker(id: str, worker: StallWorker, token: str = Depends(oaut
     # Websocket
     message = WebsocketResponse(event="stall_updated", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    worker =  dict(worker)
+    worker = WorkersServices(companyDb).findWorkerById(user["company"], worker["id"])
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Puestos",
+        "message": f"El usuario {user['userName']} ha asignado a {worker['name']} al puesto {result['name']}, cliente: {result['customerName']}"
+    })
     # Return
     return result
 
@@ -122,6 +168,15 @@ async def removeWorker(id: str, workerId: str, data: DeleteShifts, token: str = 
     # Websocket
     message = WebsocketResponse(event="stall_updated", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    worker = WorkersServices(companyDb).findWorkerById(user["company"], workerId)
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Puestos",
+        "message": f"El usuario {user['userName']} ha desasignado a {worker['name']} del puesto {result['name']}. Cliente: {result['customerName']}"
+    })
     # Return
     return result
     

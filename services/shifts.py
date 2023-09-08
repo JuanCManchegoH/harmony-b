@@ -2,7 +2,7 @@ import datetime
 import pytz
 from pymongo.database import Database
 from pymongo import UpdateOne
-from models.shift import Shift, UpdateShift
+from models.shift import Shift
 from schemas.user import UserEntity
 from bson.objectid import ObjectId
 from utils.errorsResponses import errors
@@ -27,17 +27,21 @@ class ShiftsServices():
         except Exception as e:
             raise errors["Creation error"] from e
         
-    def findShiftsByStall(self, company: str, stallsIds: List[str], customer: str, customers: List[str]) -> List[Shift]:
+    def findShiftsByCustomer(self, company: str, stallsIds: List[str], customer: str) -> List[Shift]:
         try:
             stallShifts = self.db.shifts.find({"company": company, "stall": {"$in": stallsIds}})
-            if len(customers) == 0:
-                customerShifts = self.db.shifts.find({"company": company, "customer": customer})
-                shifts = list(stallShifts) + list(customerShifts)
-                return shifts or []
-            if len(customers) > 0:
-                customersShifts = self.db.shifts.find({"company": company, "customer": {"$in": customers}})
-                shifts = list(stallShifts) + list(customersShifts)
-                return shifts or []
+            customerShifts = self.db.shifts.find({"company": company, "stall": customer})
+            shifts = list(stallShifts) + list(customerShifts)
+            return shifts or []
+        except Exception as e:
+            raise errors["Read error"] from e
+    
+    def findShiftsByCustomers(self, company: str, stallsIds: List[str], customers: List[str]) -> List[Shift]:
+        try:
+            stallShifts = self.db.shifts.find({"company": company, "stall": {"$in": stallsIds}})
+            customersShifts = self.db.shifts.find({"company": company, "stall": {"$in": customers}})
+            shifts = list(stallShifts) + list(customersShifts)
+            return shifts or []
         except Exception as e:
             raise errors["Read error"] from e
         

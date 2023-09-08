@@ -13,6 +13,7 @@ from routers.customers import customers
 from routers.workers import workers
 from routers.stalls import stalls
 from routers.shifts import shifts
+from routers.logs import logs
 from routers.websocket import ws
 
 app = FastAPI()
@@ -45,4 +46,5 @@ app.include_router(customers)
 app.include_router(workers)
 app.include_router(stalls)
 app.include_router(shifts)
+app.include_router(logs)
 app.include_router(ws)

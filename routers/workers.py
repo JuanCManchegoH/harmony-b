@@ -6,6 +6,7 @@ from services.users import UsersServices
 from services.companies import CompaniesServices
 from services.workers import WorkersServices
 from services.websocket import manager
+from services.logs import LogsServices
 from models.worker import Worker, UpdateWorker
 from models.websocket import WebsocketResponse
 from schemas.worker import WorkerEntity, WorkerEntityList
@@ -32,6 +33,14 @@ async def createWorker(worker: Worker, token: str = Depends(oauth2_scheme)) -> J
     # Websocket
     message = WebsocketResponse(event="worker_created", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Personal",
+        "message": f"El usuario {user['userName']} ha creado a la persona {result['name']}"
+    })
     # Return
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
@@ -65,6 +74,14 @@ async def updateWorker(id: str, worker: UpdateWorker, token: str = Depends(oauth
     # Websocket
     message = WebsocketResponse(event="worker_updated", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Personal",
+        "message": f"El usuario {user['userName']} ha actualizado a la persona {result['name']}"
+    })
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
@@ -83,5 +100,13 @@ async def deleteWorker(id: str, token: str = Depends(oauth2_scheme)) -> JSONResp
     # Websocket
     message = WebsocketResponse(event="worker_deleted", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Personal",
+        "message": f"El usuario {user['userName']} ha eliminado a la persona {result['name']}"
+    })
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)

@@ -8,6 +8,7 @@ from services.companies import CompaniesServices
 from services.shifts import ShiftsServices
 from services.stalls import StallsServices
 from services.websocket import manager
+from services.logs import LogsServices
 from models.shift import CreateAndUpdateShifts, DeleteShifts
 from models.websocket import WebsocketResponse
 from schemas.shift import ShiftsEntity
@@ -59,6 +60,21 @@ async def createAndUpdateShifts(shifts: CreateAndUpdateShifts, token: str = Depe
     # Websocket
     # message = WebsocketResponse(event="shifts_created_and_updated", data=result, userName=user["userName"], company=user["company"])
     # await manager.broadcast(message)
+    # Log
+    if len(shifts.create) > 0:
+        create = dict(shifts.create[0])
+        stall = StallsServices(companyDb).findStall(create["stall"])
+    if len(shifts.update) > 0:
+        update = dict(shifts.update[0])
+        stall = StallsServices(companyDb).findStall(update["stall"])
+    stall = dict(stall)
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Turnos",
+        "message": f"El usuario {user['userName']} ha creado y/o actualizado turnos en el puesto {stall['name']}. Cliente: {stall['customerName']}"
+    })
     # Return
     return result
 
@@ -77,6 +93,16 @@ async def deleteShifts(stallId: str, data:DeleteShifts, token: str = Depends(oau
     result = ShiftsEntity(result)
     # Websocket
     # message = WebsocketResponse(event="shifts_deleted", data=result, userName=user["userName"], company=user["company"])
-    # await manager.broadcast(message)
+    # await manager.broadcast(message)\
+    # Log
+    stall = StallsServices(companyDb).findStall(stallId)
+    stall = dict(stall)
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Turnos",
+        "message": f"El usuario {user['userName']} ha eliminado turnos en el puesto {stall['name']}. Cliente: {stall['customerName']}"
+    })
     # Return
     return result

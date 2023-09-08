@@ -32,6 +32,17 @@ class WorkersServices():
         except Exception as e:
             raise errors["Creation error"] from e
         
+    def findWorkerById(self, company: str, id: str) -> Worker:
+        try:
+            worker = self.db.workers.find_one({"_id": ObjectId(id)})
+            if not worker:
+                return errors["Read error"]
+            if worker["company"] != company:
+                raise errors["Unauthorized"]
+            return worker
+        except Exception as e:
+            raise errors["Read error"] from e
+        
     def findWorkersByNameOrIdentification(self, company: str, search: str, limit: int, skip: int, userTags: list) -> List[Worker]:
         try:
             if "all" in userTags:

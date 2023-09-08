@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import JSONResponse
 from db.client import db_client
+from services.companies import CompaniesServices
 from services.users import UsersServices
 from services.sequences import SequencesServices
 from services.websocket import manager
+from services.logs import LogsServices
 from models.company import Sequence
 from models.websocket import WebsocketResponse
 from schemas.company import CompanyEntity
@@ -28,6 +30,16 @@ async def addSequence(sequence: Sequence, token: str = Depends(oauth2_scheme)) -
     # Websocket
     message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    company = CompaniesServices(db).getCompany(user["company"])
+    companyDb = db_client[company["db"]]
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Secuencias",
+        "message": f"El usuario {user['userName']} ha creado una secuencia"
+    })
     # Return
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
@@ -44,6 +56,16 @@ async def updateSequence(sequenceId: str, sequence: Sequence, token: str = Depen
     # Websocket
     message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    company = CompaniesServices(db).getCompany(user["company"])
+    companyDb = db_client[company["db"]]
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Secuencias",
+        "message": f"El usuario {user['userName']} ha actualizado una secuencia"
+    })
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
@@ -60,5 +82,15 @@ async def deleteSequence(sequenceId: str, token: str = Depends(oauth2_scheme)) -
     # Websocket
     message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
     await manager.broadcast(message)
+    # Log
+    company = CompaniesServices(db).getCompany(user["company"])
+    companyDb = db_client[company["db"]]
+    _ = LogsServices(companyDb).createLog({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Secuencias",
+        "message": f"El usuario {user['userName']} ha eliminado una secuencia"
+    })
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
