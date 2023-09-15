@@ -35,3 +35,6 @@ class UpdateWorker(BaseModel):
     fields: List[Field]
     tags: List[str]
     active: bool = True
+    
+class GetByIds(BaseModel):
+    ids: List[str]

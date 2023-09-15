@@ -7,7 +7,7 @@ from services.companies import CompaniesServices
 from services.workers import WorkersServices
 from services.websocket import manager
 from services.logs import LogsServices
-from models.worker import Worker, UpdateWorker
+from models.worker import GetByIds, Worker, UpdateWorker
 from models.websocket import WebsocketResponse
 from schemas.worker import WorkerEntity, WorkerEntityList
 from schemas.user import UserEntity
@@ -55,6 +55,21 @@ async def findWorkers(search: str, limit: int, skip: int, token: str = Depends(o
     company = CompaniesServices(harmony).getCompany(user["company"])
     companyDb = db_client[company["db"]]
     result = WorkersServices(companyDb).findWorkersByNameOrIdentification(user["company"], search, limit, skip, user["workers"])
+    result = WorkerEntityList(result)
+    # Return
+    return JSONResponse(status_code=status.HTTP_200_OK, content=result)
+
+# Find workers by an array of ids
+@workers.post(path="/array", summary="Find workers by an array of ids", description="This endpoint finds workers by an array of ids in the database and returns the workers object.", status_code=200)
+async def findWorkersByAnArray(data: GetByIds, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    # Validations
+    token = decodeAccessToken(token)
+    allowed_roles(token["roles"], ["read_workers", "admin"])
+    # Find workers
+    user = UsersServices(harmony).getByEmail(token["email"])
+    company = CompaniesServices(harmony).getCompany(user["company"])
+    companyDb = db_client[company["db"]]
+    result = WorkersServices(companyDb).findWorkersByAnArray(user["company"], data.ids)
     result = WorkerEntityList(result)
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)

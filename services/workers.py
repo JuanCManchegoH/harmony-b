@@ -2,6 +2,7 @@ import pytz
 import datetime
 from models.worker import Worker, UpdateWorker
 from schemas.user import UserEntity
+from bson.objectid import ObjectId
 from pymongo.database import Database
 from bson import ObjectId
 from utils.errorsResponses import errors
@@ -49,6 +50,13 @@ class WorkersServices():
                 workers = self.db.workers.find({"company": company, "$or": [{"name": {"$regex": search, "$options": "i"}}, {"identification": {"$regex": search, "$options": "i"}}]}).limit(limit).skip(skip)
                 return workers or []
             workers = self.db.workers.find({"company": company, "tags": {"$in": userTags}, "$or": [{"name": {"$regex": search, "$options": "i"}}, {"identification": {"$regex": search, "$options": "i"}}]}).limit(limit).skip(skip)
+            return workers or []
+        except Exception as e:
+            raise errors["Read error"] from e
+        
+    def findWorkersByAnArray(self, company: str, ids: List[str]) -> List[Worker]:
+        try:
+            workers = self.db.workers.find({"company": company, "_id": {"$in": [ObjectId(id) for id in ids]}})
             return workers or []
         except Exception as e:
             raise errors["Read error"] from e
