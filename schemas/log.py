@@ -1,4 +1,7 @@
-def LogEntity(log) -> dict:
+"""Log schemas module."""
+
+def log_entity(log) -> dict:
+    """Log entity."""
     return {
         "id": str(log["_id"]),
         "company": log["company"],
@@ -10,6 +13,7 @@ def LogEntity(log) -> dict:
         "year": log["year"],
         "createdAt": log["createdAt"]
     }
-    
-def LogsEntity(logs) -> list:
-    return [LogEntity(log) for log in logs]
+
+def log_entity_list(logs) -> list:
+    """Log entity list."""
+    return [log_entity(log) for log in logs]

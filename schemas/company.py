@@ -1,4 +1,7 @@
-def CompanyEntity(company) -> dict:
+"""Company schemas."""
+
+def company_entity(company) -> dict:
+    """Company entity."""
     return {
         "id": str(company["_id"]),
         "db": company["db"],
@@ -15,6 +18,7 @@ def CompanyEntity(company) -> dict:
         "logo": company["logo"],
         "active": company["active"],
     }
-    
-def CompanyEntityList(companies) -> list:
-    return [CompanyEntity(company) for company in companies]
+
+def company_entity_list(companies) -> list:
+    """Company entity list."""
+    return [company_entity(company) for company in companies]

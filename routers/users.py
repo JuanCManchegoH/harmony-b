@@ -1,43 +1,57 @@
+"""Users router module."""
+
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
+from pymongo.database import Database
+from db.client import db_client
 from models.user import UpdateUser, User, Login
-from schemas.user import UserEntity, UserEntityList
-from services.companies import CompaniesServices
-from utils.auth import decodeAccessToken
+from models.websocket import WebsocketResponse
+from schemas.user import user_entity, user_entity_list
+from utils.auth import decode_access_token
 from utils.roles import required_roles
 from utils.errorsResponses import errors
-from services.users import UsersServices
-from db.client import db_client
+from services.companies import CompaniesServices
 from services.websocket import manager
+from services.users import UsersServices
 from services.logs import LogsServices
-from models.websocket import WebsocketResponse
 
 users = APIRouter(prefix='/users', tags=['Users'], responses={404: {"description": "Not found"}})
-harmony = db_client["harmony"]
+database = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-user_services = UsersServices(harmony)
+user_services = UsersServices(database)
+companies_services = CompaniesServices(database)
+def logs_services(company_db: Database):
+    """Logs services."""
+    return LogsServices(company_db)
 
-# create a user
-@users.post(path="", summary="Create a user", description="This endpoint creates a user in the database and returns the user object.", status_code=201)
-async def createUser(new_user: User, token: str = Depends(oauth2_scheme)):
+@users.post(
+    path="",
+    summary="Create a user",
+    description="This endpoint creates a user in the database and returns the user object.",
+    status_code=201)
+async def create_user(new_user: User, token: str = Depends(oauth2_scheme)):
+    """Create a user."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     new_user_roles = new_user.roles
-    required_role = "super_admin" if any(role in new_user_roles for role in ["super_admin"]) else "admin"
+    required_role = "super_admin" if any(
+        role in new_user_roles for role in ["super_admin"]) else "admin"
     required_roles(token["roles"], [required_role])
     # Create user
-    result = user_services.createUser(new_user)
-    result = UserEntity(result)
-    print("Here")
+    result = user_services.create_user(new_user)
+    result = user_entity(result)
     # Websocket
-    user = UsersServices(harmony).getByEmail(token["email"])
-    message = WebsocketResponse(event="user_created", data=result, userName=user["userName"], company=user["company"])
+    user = user_services.get_by_email(token["email"])
+    message = WebsocketResponse(
+        event="user_created",
+        data=result, userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    _ = LogsServices(companyDb).createLog({
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
@@ -47,58 +61,76 @@ async def createUser(new_user: User, token: str = Depends(oauth2_scheme)):
     # Return
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
-# login
-@users.post(path="/login", summary="Login", description="This endpoint logs a user in and returns a token.", status_code=200)
+@users.post(
+    path="/login",
+    summary="Login",
+    description="This endpoint logs a user in and returns a token.",
+    status_code=200)
 async def login(data: Login):
+    """Login a user."""
     # Create token
-    result = UsersServices(harmony).login(data.email, data.password)
+    result = user_services.login(data.email, data.password)
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
-# get user profile
-@users.get(path="/profile", summary="Get user by token", description="This endpoint returns a user by token.", status_code=200)
-async def getByProfile(token: str = Depends(oauth2_scheme)):
+@users.get(
+    path="/profile",
+    summary="Get user by token",
+    description="This endpoint returns a user by token.",
+    status_code=200)
+async def get_by_profile(token: str = Depends(oauth2_scheme)):
+    """Get user by token."""
     # Get token data
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     # Get profile
-    result = UsersServices(harmony).getProfile(token["email"])
-    result = UserEntity(result)
+    result = user_services.get_profile(token["email"])
+    result = user_entity(result)
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
-# get all users by company
-@users.get(path="/company/{company}", summary="Get all users by company", description="This endpoint returns all users by company.", status_code=200)
-async def getByCompany(company: str, token: str = Depends(oauth2_scheme)):
+@users.get(
+    path="/company/{company}",
+    summary="Get all users by company",
+    description="This endpoint returns all users by company.",
+    status_code=200)
+async def get_by_company(company: str, token: str = Depends(oauth2_scheme)):
+    """Get all users by company."""
     # Get token data
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     # Get users
-    result = UsersServices(harmony).getByCompany(company)
-    result = UserEntityList(result)
+    result = user_services.get_by_company(company)
+    result = user_entity_list(result)
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
-    
-# update a user
-@users.put(path="/{id}", summary="Update a user", description="This endpoint updates a user in the database and returns the user object.", status_code=200)
-async def update(user: UpdateUser, id: str, token: str = Depends(oauth2_scheme)):
+
+@users.put(
+    path="/{user_id}",
+    summary="Update a user",
+    description="This endpoint updates a user in the database and returns the user object.",
+    status_code=200)
+async def update_user(user: UpdateUser, user_id: str, token: str = Depends(oauth2_scheme)):
+    """Update a user."""
     # Validations
-    token = decodeAccessToken(token)
-    user_to_update = UsersServices(harmony).getUser(id)
-    if not user_to_update:
-        raise errors["Update error"]
+    token = decode_access_token(token)
+    user_to_update = user_services.get_user(user_id)
     user_roles = dict(user_to_update)["roles"]
-    required_role = "super_admin" if any(role in user_roles for role in ["super_admin"]) else "admin"
+    required_role = "super_admin" if any(
+        role in user_roles for role in ["super_admin"]) else "admin"
     required_roles(token["roles"], [required_role])
     # Update user
-    result = UsersServices(harmony).update(user, id)
-    result = UserEntity(result)
+    result = user_services.update_user(user, user_id)
+    result = user_entity(result)
     # Websocket
-    user = UsersServices(harmony).getByEmail(token["email"])
-    message = WebsocketResponse(event="user_updated", data=result, userName=result["userName"], company=user["company"])
+    user = user_services.get_by_email(token["email"])
+    message = WebsocketResponse(
+        event="user_updated",
+        data=result, userName=result["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    _ = LogsServices(companyDb).createLog({
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
@@ -107,30 +139,38 @@ async def update(user: UpdateUser, id: str, token: str = Depends(oauth2_scheme))
     })
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
-    
-    
+
 # delete a user
-@users.delete(path="/{id}", summary="Delete a user", description="This endpoint deletes a user in the database and returns a boolean.", status_code=200)
-async def delete(id: str, token: str = Depends(oauth2_scheme)):
+@users.delete(
+    path="/{user_id}",
+    summary="Delete a user",
+    description="This endpoint deletes a user in the database and returns a boolean.",
+    status_code=200)
+async def delete_user(user_id: str, token: str = Depends(oauth2_scheme)):
+    """Delete a user."""
     # Validations
-    token = decodeAccessToken(token)
-    user_to_delete = UsersServices(harmony).getUser(id)
+    token = decode_access_token(token)
+    user_to_delete = user_services.get_user(user_id)
     if not user_to_delete:
         raise errors["Delete error"]
     user_roles = dict(user_to_delete)["roles"]
-    required_role = "super_admin" if any(role in user_roles for role in ["super_admin"]) else "admin"
+    required_role = "super_admin" if any(
+        role in user_roles for role in ["super_admin"]) else "admin"
     required_roles(token["roles"], [required_role])
     # Delete user
-    result = UsersServices(harmony).delete(id)
-    result = UserEntity(result)
+    result = user_services.delete_user(user_id)
+    result = user_entity(result)
     # Websocket
-    user = UsersServices(harmony).getByEmail(token["email"])
-    message = WebsocketResponse(event="user_deleted", data=result, userName=result["userName"], company=user["company"])
+    user = user_services.get_by_email(token["email"])
+    message = WebsocketResponse(
+        event="user_deleted",
+        data=result, userName=result["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    _ = LogsServices(companyDb).createLog({
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],

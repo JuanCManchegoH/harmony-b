@@ -1,4 +1,7 @@
-def UserEntity(user) -> dict:
+"""User schemas module."""
+
+def user_entity(user) -> dict:
+    """User entity."""
     return {
         "id": str(user["_id"]),
         "userName": user["userName"],
@@ -10,5 +13,6 @@ def UserEntity(user) -> dict:
         "active": user["active"],
     }
 
-def UserEntityList(users) -> list:
-    return [UserEntity(user) for user in users]
+def user_entity_list(users) -> list:
+    """User entity list."""
+    return [user_entity(user) for user in users]

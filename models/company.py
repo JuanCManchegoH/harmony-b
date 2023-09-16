@@ -1,8 +1,10 @@
-from pydantic import BaseModel
-from typing import List
+"""Company models module."""
 
-# campo
+from typing import List
+from pydantic import BaseModel
+
 class Field(BaseModel):
+    """Field model."""
     id: str = None
     name: str
     type: str
@@ -11,41 +13,42 @@ class Field(BaseModel):
     required: bool
     active: bool = True
 
-# cargo  
 class Position(BaseModel):
+    """Position model."""
     id: str = None
     name: str
     value: int
     year: int
 
-# convencion   
 class Convention(BaseModel):
+    """Convention model."""
     id: str = None
     name: str
     color: str
     abbreviation: str
     keep: bool
 
-# paso   
 class Step(BaseModel):
+    """Step model."""
     startTime: str
     endTime: str
     color: str
 
-# secuencia
 class Sequence(BaseModel):
+    """Sequence model."""
     id: str = None
     name: str
     steps: List[Step]
-    
-# etiqueta
+
 class Tag(BaseModel):
+    """Tag model."""
     id: str = None
     name: str
     color: str
     scope: str
-    
+
 class Company(BaseModel):
+    """Company model."""
     id: str = None
     name: str
     db: str
@@ -62,6 +65,7 @@ class Company(BaseModel):
     active: bool = True
 
 class UpdateCompany(BaseModel):
+    """Update company model."""
     name: str = None
     website: str = None
     pColor: str = None

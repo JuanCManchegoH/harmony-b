@@ -1,92 +1,178 @@
+"""Users services module."""
+
+from typing import List
+from pymongo.database import Database
+from pymongo.errors import PyMongoError
+from bson import ObjectId
 from services.companies import CompaniesServices
 from models.user import UpdateUser, User
 from models.user import Profile
-from schemas.company import CompanyEntity
-from pymongo.database import Database
-from bson import ObjectId
-from utils.errorsResponses import errors
-from utils.auth import createAccessToken, getHashedPassword, verifyPassword
-from typing import Optional, List
+from schemas.company import company_entity
+from utils.auth import create_access_token, get_hashed_password, verify_password
+
+class Error(Exception):
+    """Base class for exceptions in this module."""
 
 class UsersServices():
-    def __init__(self, db: Database) -> None:
-        self.db = db
+    """Users services class."""
+    def __init__(self, database: Database) -> None:
+        self.database = database
 
-    def getUser(self, id: str) -> Optional[User]:
-        try:
-            user = self.db.users.find_one({"_id": ObjectId(id)})
-            return user or None
-        except Exception as e:
-            raise errors["Read error"] from e
-        
-    def getByEmail(self, email: str) -> Optional[User]:
-        try:
-            user = self.db.users.find_one({"email": email})
-            return user or None
-        except Exception as e:
-            raise errors["Read error"] from e
-    
-    def authenticateUser(self, email: str, password: str) -> Optional[User]:
-        try:
-            user = self.getByEmail(email)
-            if user is None or not verifyPassword(password, user["password"]):
-                raise errors["Authentication error"]
-            return user or None
-        except Exception as e:
-            raise errors["Authentication error"] from e
+    def get_user(self, user_id: str) -> User:
+        """
+        Get a user.
+        Args:
+            user_id (str): User id.
+        Returns:
+            User: User.
+        Raises:
+            Exception: If there's an error reading the user.
+        """
 
-    def createUser(self, user: User) -> User:
         try:
-            user_data = dict(user)
-            del user_data["id"]
-            # print("here")
-            if self.getByEmail(user_data["email"]):
-                raise errors["Creation error"]
-            user_data["password"] = getHashedPassword(user_data["password"])
-            insertion_result = self.db.users.insert_one(user_data)
-            created_user = self.getUser(str(insertion_result.inserted_id))
+            user = self.database.users.find_one({"_id": ObjectId(user_id)})
+            return user
+        except PyMongoError as exception:
+            raise Error(f"Error reading user: {exception}") from exception
+
+    def get_by_email(self, email: str) -> User:
+        """
+        Get a user.
+        Args:
+            email (str): User email.
+        Returns:
+            User: User.
+        Raises:
+            Exception: If there's an error reading the user.
+        """
+        try:
+            user = self.database.users.find_one({"email": email})
+            return user
+        except PyMongoError as exception:
+            raise Error(f"Error reading user: {exception}") from exception
+
+    def authenticate_user(self, email: str, password: str) -> User:
+        """
+        Authenticate a user.
+        Args:
+            email (str): User email.
+            password (str): User password.
+        Returns:
+            User: User.
+        Raises:
+            Exception: If there's an error reading the user.
+        """
+        try:
+            user = self.get_by_email(email)
+            if user is None or not verify_password(password, user["password"]):
+                raise Error("Authentication error")
+            return user
+        except PyMongoError as exception:
+            raise Error(f"Error reading user: {exception}") from exception
+
+    def create_user(self, user: User) -> User:
+        """
+        Create a user.
+        Args:
+            user (User): User to create.
+        Returns:
+            User: Created user.
+        Raises:
+            Exception: If there's an error creating the user.
+        """
+        try:
+            del user["id"]
+            if self.get_by_email(user["email"]):
+                raise Error("User already exists")
+            user["password"] = get_hashed_password(user["password"])
+            insertion_result = self.database.users.insert_one(user)
+            created_user = self.get_user(str(insertion_result.inserted_id))
             return created_user
-        except Exception as e:
-            raise errors["Creation error"] from e
-      
+        except PyMongoError as exception:
+            raise Error(f"Error creating user: {exception}") from exception
+
     def login(self, email: str, password: str) -> dict:
+        """
+        Login a user.
+        Args:
+            email (str): User email.
+            password (str): User password.
+        Returns:
+            dict: Token.
+        Raises:
+            Exception: If there's an error reading the user.
+        """
         try:
-            user = self.authenticateUser(email, password)
-            user = dict(user)
-            token = createAccessToken(data={"sub": user["email"], "roles": user["roles"]})
+            user = self.authenticate_user(email, password)
+            token = create_access_token(data={"sub": user["email"], "roles": user["roles"]})
             return {"access_token": token, "token_type": "bearer"}
-        except Exception as e:
-            raise errors["Authentication error"] from e
-    
-    def getProfile(self, email: str) -> Profile:
-        try: 
-            user = self.getByEmail(email)
-            company = CompaniesServices(self.db).getCompany(user["company"])
-            user["company"] = CompanyEntity(company)
+        except PyMongoError as exception:
+            raise Error(f"Error reading user: {exception}") from exception
+
+    def get_profile(self, email: str) -> Profile:
+        """
+        Get profile.
+        Args:
+            email (str): User email.
+        Returns:
+            Profile: Profile.
+        Raises:
+            Exception: If there's an error reading the user.
+        """
+        try:
+            user = self.get_by_email(email)
+            company = CompaniesServices(self.database).get_company(user["company"])
+            user["company"] = company_entity(company)
             return user
-        except Exception as e:
-            raise errors["Read error"] from e
-        
-    def getByCompany(self, company: str) -> List[User]:
+        except PyMongoError as exception:
+            raise Error(f"Error reading user: {exception}") from exception
+
+    def get_by_company(self, company_id: str) -> List[User]:
+        """
+        Get users by company.
+        Args:
+            company (str): Company.
+        Returns:
+            List[User]: List of users.
+        Raises:
+            Exception: If there's an error reading the users.
+        """
         try:
-            users = self.db.users.find({"company": company})
-            return users or []
-        except Exception as e:
-            raise errors["Read error"] from e
-    
-    def update(self, user: UpdateUser, id: str) -> User:
+            users = self.database.users.find({"company": company_id})
+            return users
+        except PyMongoError as exception:
+            raise Error(f"Error reading users: {exception}") from exception
+
+    def update_user(self, user: UpdateUser, user_id: str) -> User:
+        """
+        Update a user.
+        Args:
+            user (User): User to update.
+        Returns:
+            User: Updated user.
+        Raises:
+            errors["Update error"]: If the user could not be updated.
+        """
         try:
-            user = dict(user)
-            self.db.users.update_one({"_id": ObjectId(id)}, {"$set": user})
-            updated_user = self.getUser(id)
+            self.database.users.update_one({"_id": ObjectId(user_id)}, {"$set": user})
+            updated_user = self.get_user(user_id)
             return updated_user
-        except:
-            raise errors["Update error"]
-        
-    def delete(self, id: str) -> User:
+        except PyMongoError as exception:
+            raise Error(f"Error updating user: {exception}") from exception
+
+    def delete_user(self, user_id: str) -> User:
+        """
+        Delete a user.
+        Args:
+            user_id (str): User id.
+        Returns:
+            User: Deleted user.
+        Raises:
+            errors["Delete error"]: If the user could not be deleted.
+        """
         try:
-            user = self.db.users.find_one({"_id": ObjectId(id)})
-            self.db.users.delete_one({"_id": ObjectId(id)})
+            user = self.get_user(user_id)
+            self.database.users.delete_one({"_id": ObjectId(id)})
             return user
-        except:
-            raise errors["Deletion error"]
+        except PyMongoError as exception:
+            raise Error(f"Error deleting user: {exception}") from exception

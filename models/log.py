@@ -1,7 +1,9 @@
-from typing import List
+"""Log models module."""
+
 from pydantic import BaseModel
 
 class Log(BaseModel):
+    """Log model."""
     id: str = None
     company: str = None
     user: str = None
@@ -13,6 +15,7 @@ class Log(BaseModel):
     createdAt: str = None
 
 class CreateLog(BaseModel):
+    """CreateLog model."""
     company: str = None
     user: str = None
     userName: str = None
