@@ -8,7 +8,7 @@ from pymongo.database import Database
 from db.client import db_client
 from services.companies import CompaniesServices
 from services.users import UsersServices
-from services.w_fields import WFieldsServices
+from services.c_fields import CFieldsServices
 from services.websocket import manager
 from services.logs import LogsServices
 from models.company import Field
@@ -17,40 +17,39 @@ from schemas.company import company_entity
 from utils.auth import decode_access_token
 from utils.roles import required_roles
 
-wfields = APIRouter(
-    prefix="/wfields",
-    tags=["WFields"],
+cfields = APIRouter(
+    prefix="/cfields",
+    tags=["CFields"],
     responses={404: {"description": "Not found"}})
 database = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 companies_services = CompaniesServices(database)
-wf_services = WFieldsServices(database)
+cf_services = CFieldsServices(database)
 users_services = UsersServices(database)
 def logs_services(company_db: Database):
     """Logs services."""
     return LogsServices(company_db)
 
-@wfields.post(
+@cfields.post(
     path="",
-    summary="Add a worker field",
-    description="Add a worker field to a company",
+    summary="Add a customer field",
+    description="Add a customer field to a company",
     status_code=status.HTTP_201_CREATED)
-async def add_wfield(field: Field, token: str = Depends(oauth2_scheme)) -> JSONResponse:
-    """Add a worker field."""
+async def add_cfield(field: Field, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Add a customer field."""
     # Validations
     token = decode_access_token(token)
     required_roles(token["roles"], ["admin"])
-    # encode worker field
+    # encode customer field
     field = jsonable_encoder(field)
-    # Add worker field
+    # Add customer field
     user = users_services.get_by_email(token["email"])
-    result = wf_services.add_wfield(user["company"], field)
+    result = cf_services.add_cfield(user["company"], field)
     result = company_entity(result)
     # Websocket
     message = WebsocketResponse(
         event="company_updated",
-        data=result,
-        userName=user["userName"],
+        data=result, userName=user["userName"],
         company=user["company"])
     await manager.broadcast(message)
     # Log
@@ -60,36 +59,35 @@ async def add_wfield(field: Field, token: str = Depends(oauth2_scheme)) -> JSONR
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
-        "type": "Campos de personal",
-        "message": f"El usuario {user['userName']} ha creado un campo de personal"
+        "type": "Campos de clientes",
+        "message": f"El usuario {user['userName']} ha creado un campo de clientes"
     })
     # Return
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
-@wfields.put(
-    path="/{field_id}",
-    summary="Update a worker field",
-    description="Update a worker field from a company",
+@cfields.put(
+    path="/{fieldId}",
+    summary="Update a customer field",
+    description="Update a customer field from a company",
     status_code=status.HTTP_200_OK)
-async def update_wfield(
+async def update_cfield(
     field_id: str,
     field: Field,
     token: str = Depends(oauth2_scheme)) -> JSONResponse:
-    """Update a worker field."""
+    """Update a customer field."""
     # Validations
     token = decode_access_token(token)
     required_roles(token["roles"], ["admin"])
-    # encode worker field
+    # encode customer field
     field = jsonable_encoder(field)
-    # Update worker field
+    # Update customer field
     user = users_services.get_by_email(token["email"])
-    result = wf_services.update_wfield(user["company"], field_id, field)
+    result = cf_services.update_cfield(user["company"], field_id, field)
     result = company_entity(result)
     # Websocket
     message = WebsocketResponse(
         event="company_updated",
-        data=result,
-        userName=user["userName"],
+        data=result, userName=user["userName"],
         company=user["company"])
     await manager.broadcast(message)
     # Log
@@ -99,31 +97,30 @@ async def update_wfield(
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
-        "type": "Campos de personal",
-        "message": f"El usuario {user['userName']} ha actualizado un campo de personal"
+        "type": "Campos de clientes",
+        "message": f"El usuario {user['userName']} ha actualizado un campo de clientes"
     })
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
-@wfields.delete(
-    path="/{field_id}",
-    summary="Delete a worker field",
-    description="Delete a worker field from a company",
+@cfields.delete(
+    path="/{fieldId}",
+    summary="Delete a customer field",
+    description="Delete a customer field from a company",
     status_code=status.HTTP_200_OK)
-async def delete_wfield(field_id: str, token: str = Depends(oauth2_scheme)) -> JSONResponse:
-    """Delete a worker field."""
+async def delete_cfield(field_id: str, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Delete a customer field."""
     # Validations
     token = decode_access_token(token)
     required_roles(token["roles"], ["admin"])
-    # Delete worker field
+    # Delete customer field
     user = users_services.get_by_email(token["email"])
-    result = wf_services.delete_wfield(user["company"], field_id)
+    result = cf_services.delete_cfield(user["company"], field_id)
     result = company_entity(result)
     # Websocket
     message = WebsocketResponse(
         event="company_updated",
-        data=result,
-        userName=user["userName"],
+        data=result, userName=user["userName"],
         company=user["company"])
     await manager.broadcast(message)
     # Log
@@ -133,8 +130,8 @@ async def delete_wfield(field_id: str, token: str = Depends(oauth2_scheme)) -> J
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
-        "type": "Campos de personal",
-        "message": f"El usuario {user['userName']} ha eliminado un campo de personal"
+        "type": "Campos de clientes",
+        "message": f"El usuario {user['userName']} ha eliminado un campo de clientes"
     })
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)

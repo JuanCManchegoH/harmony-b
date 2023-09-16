@@ -1,6 +1,10 @@
+"""Sequence router module."""
+
 from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+from pymongo.database import Database
 from db.client import db_client
 from services.companies import CompaniesServices
 from services.users import UsersServices
@@ -9,31 +13,49 @@ from services.websocket import manager
 from services.logs import LogsServices
 from models.company import Sequence
 from models.websocket import WebsocketResponse
-from schemas.company import CompanyEntity
-from utils.auth import decodeAccessToken
+from schemas.company import company_entity
+from utils.auth import decode_access_token
 from utils.roles import required_roles
 
-sequences = APIRouter(prefix="/sequences", tags=["Sequences"], responses={404: {"description": "Not found"}})
-db = db_client["harmony"]
+sequences = APIRouter(
+    prefix="/sequences",
+    tags=["Sequences"],
+    responses={404: {"description": "Not found"}})
+database = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+companies_services = CompaniesServices(database)
+sequences_services = SequencesServices(database)
+users_services = UsersServices(database)
+def logs_services(company_db: Database):
+    """Logs services."""
+    return LogsServices(company_db)
 
 # add a sequence
-@sequences.post(path="", summary="Add a sequence", description="Add a sequence to a company", status_code=status.HTTP_201_CREATED)
-async def addSequence(sequence: Sequence, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@sequences.post(
+    path="", summary="Add a sequence",
+    description="Add a sequence to a company",
+    status_code=status.HTTP_201_CREATED)
+async def add_sequence(sequence: Sequence, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Add a sequence."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     required_roles(token["roles"], ["admin"])
+    # encode sequence
+    sequence = jsonable_encoder(sequence)
     # Add sequence
-    user = UsersServices(db).getByEmail(token["email"])
-    result = SequencesServices(db).addSequence(user["company"], sequence)
-    result = CompanyEntity(result)
+    user = users_services.get_by_email(token["email"])
+    result = sequences_services.add_sequence(user["company"], sequence)
+    result = company_entity(result)
     # Websocket
-    message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
+    message = WebsocketResponse(
+        event="company_updated",
+        data=result, userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    company = CompaniesServices(db).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    _ = LogsServices(companyDb).createLog({
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
@@ -44,22 +66,35 @@ async def addSequence(sequence: Sequence, token: str = Depends(oauth2_scheme)) -
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
 # update a sequence
-@sequences.put(path="/{sequenceId}", summary="Update a sequence", description="Update a sequence from a company", status_code=status.HTTP_200_OK)
-async def updateSequence(sequenceId: str, sequence: Sequence, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@sequences.put(
+    path="/{sequence_id}",
+    summary="Update a sequence",
+    description="Update a sequence from a company",
+    status_code=status.HTTP_200_OK)
+async def update_sequence(
+    sequence_id: str,
+    sequence: Sequence,
+    token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Update a sequence."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     required_roles(token["roles"], ["admin"])
+    # encode sequence
+    sequence = jsonable_encoder(sequence)
     # Update sequence
-    user = UsersServices(db).getByEmail(token["email"])
-    result = SequencesServices(db).updateSequence(user["company"], sequenceId, sequence)
-    result = CompanyEntity(result)
+    user = users_services.get_by_email(token["email"])
+    result = sequences_services.update_sequence(user["company"], sequence_id, sequence)
+    result = company_entity(result)
     # Websocket
-    message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
+    message = WebsocketResponse(
+        event="company_updated",
+        data=result, userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    company = CompaniesServices(db).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    _ = LogsServices(companyDb).createLog({
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
@@ -70,22 +105,30 @@ async def updateSequence(sequenceId: str, sequence: Sequence, token: str = Depen
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
 # delete a sequence
-@sequences.delete(path="/{sequenceId}", summary="Delete a sequence", description="Delete a sequence from a company", status_code=status.HTTP_200_OK)
-async def deleteSequence(sequenceId: str, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@sequences.delete(
+    path="/{sequence_id}",
+    summary="Delete a sequence",
+    description="Delete a sequence from a company",
+    status_code=status.HTTP_200_OK)
+async def delete_sequence(sequence_id: str, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Delete a sequence."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     required_roles(token["roles"], ["admin"])
     # Delete sequence
-    user = UsersServices(db).getByEmail(token["email"])
-    result = SequencesServices(db).deleteSequence(user["company"], sequenceId)
-    result = CompanyEntity(result)
+    user = users_services.get_by_email(token["email"])
+    result = sequences_services.delete_sequence(user["company"], sequence_id)
+    result = company_entity(result)
     # Websocket
-    message = WebsocketResponse(event="company_updated", data=result, userName=user["userName"], company=user["company"])
+    message = WebsocketResponse(
+        event="company_updated",
+        data=result, userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    company = CompaniesServices(db).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    _ = LogsServices(companyDb).createLog({
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],

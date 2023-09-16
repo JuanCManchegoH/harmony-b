@@ -1,24 +1,24 @@
-"""WFields services module."""
+"""CFields services module."""
 
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
 from bson import ObjectId
-from models.company import Field, Company
+from models.company import Company, Field
 from .companies import CompaniesServices
 
 class Error(Exception):
     """Base class for exceptions in this module."""
 
-class WFieldsServices():
-    """WFields services class."""
+class CFieldsServices():
+    """CFields services class."""
     def __init__(self, database: Database) -> None:
         self.database = database
 
-    def add_wfield(self, company_id: str, field: Field) -> Company:
+    def add_cfield(self, company_id: str, field: Field) -> Company:
         """
-        Add a worker field.
+        Add a customer field.
         Args:
-            wfield_id (str): Worker field id.
+            cfield_id (str): Customer field id.
             field (Field): Field to add.
         Returns:
             Company: Company.
@@ -28,20 +28,20 @@ class WFieldsServices():
         try:
             field["id"] = str(ObjectId())
             if self.database.companies.find_one(
-                {"_id": ObjectId(company_id), "workerFields.name": field["name"]}):
+                {"_id": ObjectId(company_id), "customerFields.name": field["name"]}):
                 raise Error("Field already exists")
             self.database.companies.update_one(
-                {"_id": ObjectId(company_id)}, {"$push": {"workerFields": field}})
+                {"_id": ObjectId(company_id)}, {"$push": {"customerFields": field}})
             company = CompaniesServices(self.database).get_company(company_id)
             return company
         except PyMongoError as exception:
-            raise Error(f"Error adding worker field: {exception}") from exception
+            raise Error(f"Error adding customer field: {exception}") from exception
 
-    def update_wfield(self, company_id: str, field_id: str, field: Field) -> Company:
+    def update_cfield(self, company_id: str, field_id: str, field: Field) -> Company:
         """
-        Update a worker field.
+        Update a customer field.
         Args:
-            wfield_id (str): Worker field id.
+            cfield_id (str): Customer field id.
             field (Field): Field to update.
         Returns:
             Company: Company.
@@ -51,18 +51,18 @@ class WFieldsServices():
         try:
             field["id"] = field_id
             self.database.companies.update_one(
-                {"_id": ObjectId(company_id), "workerFields.id": field_id},
-                {"$set": {"workerFields.$": field}})
+                {"_id": ObjectId(company_id), "customerFields.id": field_id},
+                {"$set": {"customerFields.$": field}})
             company = CompaniesServices(self.database).get_company(company_id)
             return company
         except PyMongoError as exception:
-            raise Error(f"Error updating worker field: {exception}") from exception
+            raise Error(f"Error updating customer field: {exception}") from exception
 
-    def delete_wfield(self, company_id: str, field_id: str) -> Company:
+    def delete_cfield(self, company_id: str, field_id: str) -> Company:
         """
-        Delete a worker field.
+        Delete a customer field.
         Args:
-            wfield_id (str): Worker field id.
+            cfield_id (str): Customer field id.
         Returns:
             Company: Company.
         Raises:
@@ -70,9 +70,9 @@ class WFieldsServices():
         """
         try:
             self.database.companies.update_one(
-                {"_id": ObjectId(company_id)},
-                {"$pull": {"workerFields": {"id": field_id}}})
+                {"_id": ObjectId(company_id)}, {"$pull": {"customerFields": {"id": field_id}}})
             company = CompaniesServices(self.database).get_company(company_id)
             return company
         except PyMongoError as exception:
-            raise Error(f"Error deleting worker field: {exception}") from exception
+            raise Error(f"Error deleting customer field: {exception}") from exception
+        

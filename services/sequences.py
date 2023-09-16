@@ -1,47 +1,85 @@
-from .companies import CompaniesServices
-from models.company import Sequence, Company
+"""Sequence services module."""
+
+from pymongo.errors import PyMongoError
 from pymongo.database import Database
 from bson import ObjectId
-from utils.errorsResponses import errors
+from models.company import Sequence, Company
+from .companies import CompaniesServices\
+
+class Error(Exception):
+    """Base class for exceptions in this module."""
 
 class SequencesServices():
-    def __init__(self, db: Database) -> None:
-        self.db = db
-    
-    def addSequence(self, id: str, sequence: Sequence) -> Company:
+    """Sequences services class."""
+    def __init__(self, database: Database) -> None:
+        self.database = database
+
+    def add_sequence(self, company_id: str, sequence: Sequence) -> Company:
+        """
+        Add a sequence.
+        Args:
+            sequence (Sequence): Sequence to add.
+        Returns:
+            Company: Company.
+        Raises:
+            Exception: If there's an error updating the company.
+        """
         try:
-            sequence = dict(sequence)
             steps = []
             for step in sequence["steps"]:
                 steps.append(dict(step))
             sequence["steps"] = steps
             sequence["id"] = str(ObjectId())
-            if self.db.companies.find_one({"_id": ObjectId(id), "sequences.name": sequence["name"]}):
-                raise errors["Creation error"]
-            self.db.companies.update_one({"_id": ObjectId(id)}, {"$push": {"sequences": sequence}})
-            company = CompaniesServices(self.db).getCompany(id)
+            if self.database.companies.find_one(
+                {"_id": ObjectId(company_id), "sequences.name": sequence["name"]}):
+                raise Error("Sequence already exists")
+            self.database.companies.update_one(
+                {"_id": ObjectId(company_id)}, {"$push": {"sequences": sequence}})
+            company = CompaniesServices(self.database).get_company(company_id)
             return company
-        except Exception as e:
-            raise errors["Creation error"] from e
-    
-    def updateSequence(self, id: str, sequenceId: str, sequence: Sequence) -> Company:
+        except PyMongoError as exception:
+            raise Error(f"Error adding sequence: {exception}") from exception
+
+    def update_sequence(self, company_id: str, sequence_id: str, sequence: Sequence) -> Company:
+        """
+        Update a sequence.
+        Args:
+            sequence_id (str): Sequence id.
+            sequence (Sequence): Sequence to update.
+        Returns:
+            Company: Company.
+        Raises:
+            Exception: If there's an error updating the company.
+        """
         try:
-            sequence = dict(sequence)
             steps = []
             for step in sequence["steps"]:
                 steps.append(dict(step))
             sequence["steps"] = steps
-            sequence["id"] = sequenceId
-            self.db.companies.update_one({"_id": ObjectId(id), "sequences.id": sequenceId}, {"$set": {"sequences.$": sequence}})
-            company = CompaniesServices(self.db).getCompany(id)
+            sequence["id"] = sequence_id
+            self.database.companies.update_one(
+                {"_id": ObjectId(company_id), "sequences.id": sequence_id},
+                {"$set": {"sequences.$": sequence}})
+            company = CompaniesServices(self.database).get_company(company_id)
             return company
-        except Exception as e:
-            raise errors["Update error"] from e
-    
-    def deleteSequence(self, id: str, sequenceId: str) -> Company:
+        except PyMongoError as exception:
+            raise Error(f"Error updating sequence: {exception}") from exception
+
+    def delete_sequence(self, company_id: str, sequence_id: str) -> Company:
+        """
+        Delete a sequence.
+        Args:
+            sequence_id (str): Sequence id.
+        Returns:
+            Company: Company.
+        Raises:
+            Exception: If there's an error updating the company.
+        """
         try:
-            self.db.companies.update_one({"_id": ObjectId(id)}, {"$pull": {"sequences": {"id": sequenceId}}})
-            company = CompaniesServices(self.db).getCompany(id)
+            self.database.companies.update_one(
+                {"_id": ObjectId(company_id)}, {"$pull": {"sequences": {"id": sequence_id}}})
+            company = CompaniesServices(self.database).get_company(company_id)
             return company
-        except Exception as e:
-            raise errors["Deletion error"] from e
+        except PyMongoError as exception:
+            raise Error(f"Error deleting sequence: {exception}") from exception
+    
