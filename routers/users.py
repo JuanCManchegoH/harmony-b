@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.encoders import jsonable_encoder
 from pymongo.database import Database
 from db.client import db_client
 from models.user import UpdateUser, User, Login
@@ -38,6 +39,8 @@ async def create_user(new_user: User, token: str = Depends(oauth2_scheme)):
     required_role = "super_admin" if any(
         role in new_user_roles for role in ["super_admin"]) else "admin"
     required_roles(token["roles"], [required_role])
+    # encode user
+    new_user = jsonable_encoder(new_user)
     # Create user
     result = user_services.create_user(new_user)
     result = user_entity(result)
@@ -117,6 +120,8 @@ async def update_user(user: UpdateUser, user_id: str, token: str = Depends(oauth
     required_role = "super_admin" if any(
         role in user_roles for role in ["super_admin"]) else "admin"
     required_roles(token["roles"], [required_role])
+    # encode user
+    user = jsonable_encoder(user)
     # Update user
     result = user_services.update_user(user, user_id)
     result = user_entity(result)
