@@ -1,4 +1,7 @@
-def WorkerEntity(worker) -> dict:
+"""Worker schemas"""
+
+def worker_entity(worker) -> dict:
+    """Worker entity."""
     return {
         "id": str(worker["_id"]),
         "name": worker["name"],
@@ -16,5 +19,6 @@ def WorkerEntity(worker) -> dict:
         "updatedAt": worker["updatedAt"]
     }
 
-def WorkerEntityList(workers) -> list:
-    return [WorkerEntity(worker) for worker in workers]
+def worker_entity_list(workers) -> list:
+    """Worker entity list."""
+    return [worker_entity(worker) for worker in workers]

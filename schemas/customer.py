@@ -1,4 +1,7 @@
-def CustomerEntity(customer) -> dict:
+"""Customer schemas."""
+
+def customer_entity(customer) -> dict:
+    """Customer entity."""
     return {
         "id": str(customer["_id"]),
         "name": customer["name"],
@@ -17,6 +20,7 @@ def CustomerEntity(customer) -> dict:
         "createdAt": customer["createdAt"],
         "updatedAt": customer["updatedAt"]
     }
-    
-def CustomerEntityList(customers) -> list:
-    return [CustomerEntity(customer) for customer in customers]
+
+def customer_entity_list(customers) -> list:
+    """Customer entity list."""
+    return [customer_entity(customer) for customer in customers]

@@ -1,7 +1,10 @@
-from pydantic import BaseModel
+"""Customer model module."""
+
 from typing import List
+from pydantic import BaseModel
 
 class Field(BaseModel):
+    """Field model."""
     id: str
     name: str
     type: str
@@ -11,6 +14,7 @@ class Field(BaseModel):
     required: bool
 
 class Customer(BaseModel):
+    """Customer model."""
     id: str = None
     name: str
     identification: str
@@ -29,6 +33,7 @@ class Customer(BaseModel):
     updatedAt: str = None
     
 class UpdateCustomer(BaseModel):
+    """UpdateCustomer model."""
     name: str
     identification: str
     city: str

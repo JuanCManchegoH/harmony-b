@@ -1,6 +1,10 @@
+"""Workers router module."""
+
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.encoders import jsonable_encoder
+from pymongo.database import Database
 from db.client import db_client
 from services.users import UsersServices
 from services.companies import CompaniesServices
@@ -9,32 +13,52 @@ from services.websocket import manager
 from services.logs import LogsServices
 from models.worker import GetByIds, Worker, UpdateWorker
 from models.websocket import WebsocketResponse
-from schemas.worker import WorkerEntity, WorkerEntityList
-from schemas.user import UserEntity
-from utils.auth import decodeAccessToken
+from schemas.worker import worker_entity, worker_entity_list
+from schemas.user import user_entity
+from utils.auth import decode_access_token
 from utils.roles import allowed_roles
 
-workers = APIRouter(prefix='/workers', tags=['Workers'], responses={404: {"description": "Not found"}})
-harmony = db_client["harmony"]
+workers = APIRouter(
+    prefix='/workers',
+    tags=['Workers'],
+    responses={404: {"description": "Not found"}})
+database = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+user_services = UsersServices(database)
+companies_services = CompaniesServices(database)
+def workers_services(company_db: Database):
+    """Workers services."""
+    return WorkersServices(company_db)
+def logs_services(company_db: Database):
+    """Logs services."""
+    return LogsServices(company_db)
 
-# create a worker
-@workers.post(path="", summary="Create a worker", description="This endpoint creates a worker in the database and returns the worker object.", status_code=201)
-async def createWorker(worker: Worker, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@workers.post(
+    path="",
+    summary="Create a worker",
+    description="This endpoint creates a worker in the database and returns the worker object.",
+    status_code=201)
+async def create_worker(worker: Worker, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Create a worker."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["handle_workers", "admin"])
+    # Encode worker
+    worker = jsonable_encoder(worker)
     # Create worker
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = WorkersServices(companyDb).createWorker(user["company"], worker, UserEntity(user))
-    result = WorkerEntity(result)
+    user = user_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = workers_services(company_db).create_worker(user["company"], worker, user_entity(user))
+    result = worker_entity(result)
     # Websocket
-    message = WebsocketResponse(event="worker_created", data=result, userName=user["userName"], company=user["company"])
+    message = WebsocketResponse(
+        event="worker_created",
+        data=result, userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    _ = LogsServices(companyDb).createLog({
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
@@ -44,53 +68,81 @@ async def createWorker(worker: Worker, token: str = Depends(oauth2_scheme)) -> J
     # Return
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
-# find workers by name or identification, limit and offset
-@workers.get(path="/{search}/{limit}/{skip}", summary="Find workers by name or identification", description="This endpoint finds workers by name or identification in the database and returns the workers object.", status_code=200)
-async def findWorkers(search: str, limit: int, skip: int, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@workers.get(
+    path="/{search}/{limit}/{skip}",
+    summary="Find workers by name or identification",
+    description="This endpoint finds workers by name or identification",
+    status_code=200)
+async def get_workers(
+    search: str,
+    limit: int,
+    skip: int,
+    token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Find workers by name or identification."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["read_workers", "admin"])
     # Find workers
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = WorkersServices(companyDb).findWorkersByNameOrIdentification(user["company"], search, limit, skip, user["workers"])
-    result = WorkerEntityList(result)
+    user = user_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = workers_services(company_db).get_workers_by_name_or_identification(
+        user["company"], search, limit, skip, user["workers"])
+    result = worker_entity_list(result)
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
-# Find workers by an array of ids
-@workers.post(path="/array", summary="Find workers by an array of ids", description="This endpoint finds workers by an array of ids in the database and returns the workers object.", status_code=200)
-async def findWorkersByAnArray(data: GetByIds, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@workers.post(
+    path="/array",
+    summary="Find workers by an array of ids",
+    description="This endpoint finds workers by an array of ids",
+    status_code=200)
+async def get_workers_by_an_array(
+    data: GetByIds,
+    token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Find workers by an array of ids."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["read_workers", "admin"])
     # Find workers
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = WorkersServices(companyDb).findWorkersByAnArray(user["company"], data.ids)
-    result = WorkerEntityList(result)
+    user = user_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = workers_services(company_db).get_workers_by_an_array(user["company"], data.ids)
+    result = worker_entity_list(result)
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
-# Update a worker
-@workers.put(path="/{id}", summary="Update a worker", description="This endpoint updates a worker in the database and returns the worker object.", status_code=200)
-async def updateWorker(id: str, worker: UpdateWorker, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@workers.put(
+    path="/{worker_id}",
+    summary="Update a worker",
+    description="This endpoint updates a worker", status_code=200)
+async def update_worker(
+    worker_id: str,
+    worker: UpdateWorker,
+    token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Update a worker."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["handle_workers", "admin"])
+    # Encode worker
+    worker = jsonable_encoder(worker)
     # Update worker
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = WorkersServices(companyDb).updateWorker(user["company"], id, worker, UserEntity(user))
-    result = WorkerEntity(result)
+    user = user_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = workers_services(company_db).update_worker(
+        user["company"], worker_id, worker, user_entity(user))
+    result = worker_entity(result)
     # Websocket
-    message = WebsocketResponse(event="worker_updated", data=result, userName=user["userName"], company=user["company"])
+    message = WebsocketResponse(
+        event="worker_updated",
+        data=result,
+        userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    _ = LogsServices(companyDb).createLog({
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
@@ -100,23 +152,31 @@ async def updateWorker(id: str, worker: UpdateWorker, token: str = Depends(oauth
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
-# Delete a worker
-@workers.delete(path="/{id}", summary="Delete a worker", description="This endpoint deletes a worker in the database and returns the worker object.", status_code=200)
-async def deleteWorker(id: str, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@workers.delete(
+    path="/{worker_id}",
+    summary="Delete a worker",
+    description="This endpoint deletes a worker",
+    status_code=200)
+async def delete_worker(worker_id: str, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Delete a worker."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["handle_workers", "admin"])
     # Delete worker
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = WorkersServices(companyDb).deleteWorker(user["company"], id, user["workers"])
-    result = WorkerEntity(result)
+    user = user_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = workers_services(company_db).delete_worker(user["company"], worker_id, user["workers"])
+    result = worker_entity(result)
     # Websocket
-    message = WebsocketResponse(event="worker_deleted", data=result, userName=user["userName"], company=user["company"])
+    message = WebsocketResponse(
+        event="worker_deleted",
+        data=result,
+        userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    _ = LogsServices(companyDb).createLog({
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],

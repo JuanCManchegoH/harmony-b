@@ -1,7 +1,10 @@
-from pydantic import BaseModel
+"""Worker model module."""
+
 from typing import List
+from pydantic import BaseModel
 
 class Field(BaseModel):
+    """Field model."""
     id: str
     name: str
     type: str
@@ -11,6 +14,7 @@ class Field(BaseModel):
     required: bool
 
 class Worker(BaseModel):
+    """Worker model."""
     id: str = None
     name: str
     identification: str
@@ -25,8 +29,9 @@ class Worker(BaseModel):
     updatedBy: str = None
     createdAt: str = None
     updatedAt: str = None
-    
+
 class UpdateWorker(BaseModel):
+    """UpdateWorker model."""
     name: str
     identification: str
     city: str
@@ -35,6 +40,7 @@ class UpdateWorker(BaseModel):
     fields: List[Field]
     tags: List[str]
     active: bool = True
-    
+
 class GetByIds(BaseModel):
+    """GetByIds model."""
     ids: List[str]
