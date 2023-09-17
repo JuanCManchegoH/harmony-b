@@ -77,7 +77,7 @@ class ConventionsServices():
         try:
             self.database.companies.update_one(
                 {"_id": ObjectId(company_id)}, {"$pull": {"conventions": {"id": convention_id}}})
-            company = CompaniesServices(self.database).get_company(id)
+            company = CompaniesServices(self.database).get_company(company_id)
             return company
         except PyMongoError as exception:
             raise Error(f"Error deleting convention: {exception}") from exception

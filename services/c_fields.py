@@ -18,7 +18,7 @@ class CFieldsServices():
         """
         Add a customer field.
         Args:
-            cfield_id (str): Customer field id.
+            company_id (str): Company id.
             field (Field): Field to add.
         Returns:
             Company: Company.
@@ -41,6 +41,7 @@ class CFieldsServices():
         """
         Update a customer field.
         Args:
+            company_id (str): Company id.
             cfield_id (str): Customer field id.
             field (Field): Field to update.
         Returns:
@@ -62,6 +63,7 @@ class CFieldsServices():
         """
         Delete a customer field.
         Args:
+            company_id (str): Company id.
             cfield_id (str): Customer field id.
         Returns:
             Company: Company.

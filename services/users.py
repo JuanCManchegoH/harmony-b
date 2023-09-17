@@ -172,7 +172,7 @@ class UsersServices():
         """
         try:
             user = self.get_user(user_id)
-            self.database.users.delete_one({"_id": ObjectId(id)})
+            self.database.users.delete_one({"_id": ObjectId(user_id)})
             return user
         except PyMongoError as exception:
             raise Error(f"Error deleting user: {exception}") from exception

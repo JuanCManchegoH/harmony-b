@@ -1,9 +1,11 @@
+"""Shift model module."""
+
 from typing import List
 from pydantic import BaseModel
-
 from models.company import Step
 
 class Shift(BaseModel):
+    """Shift model."""
     id: str = None
     day: str
     startTime: str
@@ -21,12 +23,15 @@ class Shift(BaseModel):
     stall: str
     stallName: str
     company: str = None
+    month: str
+    year: str
     createdBy: str = None
     updatedBy: str = None
     createdAt: str = None
     updatedAt: str = None
-    
+
 class UpdateShift(BaseModel):
+    """Update shift model."""
     id: str
     startTime: str
     endTime: str
@@ -36,8 +41,9 @@ class UpdateShift(BaseModel):
     type: str
     active: bool
     keep: bool
-    
+
 class CreateShift(BaseModel):
+    """Create shift model."""
     day: str
     startTime: str
     endTime: str
@@ -53,22 +59,35 @@ class CreateShift(BaseModel):
     workerName: str
     stall: str
     stallName: str
-    
+
 class AppliedSequence(BaseModel):
+    """Applied sequence model."""
     stall: str
     worker: str
     sequence: List[Step]
     index: int
     jump: int
-    
+
+class GetShifts(BaseModel):
+    """Get shifts model."""
+    months: List[str]
+    years: List[str]
+    types: List[str]
+
 class CreateShifts(BaseModel):
+    """Create shifts model."""
     shifts: List[CreateShift]
+
+class UpdateShifts(BaseModel):
+    """Update shifts model."""
+    shifts: List[UpdateShift]
     
 class DeleteShifts(BaseModel):
+    """Delete shifts model."""
     shifts: List[str]
-    
-class CreateAndUpdateShifts(BaseModel):
-    create: List[CreateShift] = None
-    update: List[UpdateShift] = None
-    appliedSequence: AppliedSequence = None
+
+# class CreateAndUpdateShifts(BaseModel):
+#     create: List[CreateShift] = None
+#     update: List[UpdateShift] = None
+#     appliedSequence: AppliedSequence = None
     

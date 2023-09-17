@@ -42,7 +42,7 @@ class CompaniesServices():
         Args:
             company_id (str): Company id.
         Returns:
-            Optional[Company]: Company. None if not found.
+            Company: Company.
         Raises:
             Exception: If there's an error reading the company.
         """

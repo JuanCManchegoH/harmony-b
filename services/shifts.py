@@ -1,76 +1,149 @@
+"""Shifts services module."""
+
+from typing import List
 import datetime
 import pytz
 from pymongo.database import Database
+from pymongo.errors import PyMongoError
 from pymongo import UpdateOne
+from bson import ObjectId
 from models.shift import Shift
-from schemas.user import UserEntity
-from bson.objectid import ObjectId
-from utils.errorsResponses import errors
-from typing import List
+from schemas.user import user_entity
+
+class Error(Exception):
+    """Base class for exceptions in this module."""
 
 class ShiftsServices():
-    def __init__(self, db: Database) -> None:
-        self.db = db
-        
-    def createShifts(self, company: str, shifts: list, user: UserEntity) -> List[Shift]:
+    """Shifts services class."""
+    def __init__(self, database: Database) -> None:
+        self.database = database
+
+    def create_shifts(self, company: str, shifts: list, user: user_entity) -> List[Shift]:
+        """
+        Create shifts.
+        Args:
+            company (str): Company id.
+            shifts (list): Shifts to create.
+            user (user_entity): User.
+        Returns:
+            List[Shift]: Shifts.
+        Raises:
+            Exception: If there's an error creating the shifts.
+        """
         try:
-            shifts = [dict(shift) for shift in shifts]
             for shift in shifts:
                 shift["company"] = company
                 shift["createdBy"] = user["userName"]
                 shift["updatedBy"] = user["userName"]
-                shift["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
-                shift["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
-            shifts = self.db.shifts.insert_many(shifts)
-            shifts = self.db.shifts.find({"_id": {"$in": shifts.inserted_ids}})
-            return shifts or []
-        except Exception as e:
-            raise errors["Creation error"] from e
-        
-    def findShiftsByCustomer(self, company: str, stallsIds: List[str], customer: str) -> List[Shift]:
+                shift["createdAt"] = datetime.datetime.now(
+                    pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+                shift["updatedAt"] = datetime.datetime.now(
+                    pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+            shifts = self.database.shifts.insert_many(shifts)
+            shifts = self.database.shifts.find({"_id": {"$in": shifts.inserted_ids}})
+            return shifts
+        except PyMongoError as exception:
+            raise Error(f"Error creating shifts: {exception}") from exception
+
+    def get_shifts_by_workers(
+        self,
+        company: str,
+        workers_ids: List[str],
+        types: List[str]) -> List[Shift]:
+        """
+        Get shifts by workers.
+        Args:
+            company (str): Company id.
+            workers_ids (List[str]): Workers ids.
+            types (List[str]): Shift types.
+        Returns:
+            List[Shift]: Shifts.
+        Raises:
+            Exception: If there's an error finding the shifts.
+        """
         try:
-            stallShifts = self.db.shifts.find({"company": company, "stall": {"$in": stallsIds}})
-            customerShifts = self.db.shifts.find({"company": company, "stall": customer})
-            shifts = list(stallShifts) + list(customerShifts)
-            return shifts or []
-        except Exception as e:
-            raise errors["Read error"] from e
-    
-    def findShiftsByCustomers(self, company: str, stallsIds: List[str], customers: List[str]) -> List[Shift]:
+            shifts = self.database.shifts.find(
+                {"company": company, "worker": {"$in": workers_ids}, "type": {"$in": types}})
+            return shifts
+        except PyMongoError as exception:
+            raise Error(f"Error finding shifts by customer: {exception}") from exception
+
+    def get_shifts_by_month_and_year(
+        self,
+        company: str,
+        months: List[str],
+        years: List[str],
+        types: List[str]) -> List[Shift]:
+        """
+        Get shifts by month and year.
+        Args:
+            company (str): Company id.
+            months (List[str]): Months.
+            years (List[str]): Years.
+            types (List[str]): Shift types.
+        Returns:
+            List[Shift]: Shifts.
+        Raises:
+            Exception: If there's an error finding the shifts.
+        """
         try:
-            stallShifts = self.db.shifts.find({"company": company, "stall": {"$in": stallsIds}})
-            customersShifts = self.db.shifts.find({"company": company, "stall": {"$in": customers}})
-            shifts = list(stallShifts) + list(customersShifts)
-            return shifts or []
-        except Exception as e:
-            raise errors["Read error"] from e
-        
-    def updateShifts(self, company: str, shifts: list, user: UserEntity) -> List[Shift]:
+            shifts = self.database.shifts.find(
+                {"company": company, "month": {"$in": months}, "year": {"$in": years},
+                 "type": {"$in": types}})
+            return shifts
+        except PyMongoError as exception:
+            raise Error(f"Error finding shifts by month and year: {exception}") from exception
+
+    def update_shifts(self, company_id: str, shifts: list, user: user_entity) -> List[Shift]:
+        """
+        Update shifts.
+        Args:
+            company_id (str): Company id.
+            shifts (list): Shifts to update.
+            user (user_entity): User.
+        Returns:
+            List[Shift]: Shifts.
+        Raises:
+            Exception: If there's an error updating the shifts.
+        """
         try:
-            shifts = [dict(shift) for shift in shifts]  # Convert shifts to dict
-            ids = [ObjectId(shift["id"]) for shift in shifts]  # Get ids from shifts
+            ids = [ObjectId(shift["id"]) for shift in shifts]
             update_operations = []
             for shift in shifts:
                 updated_shift = dict(shift)
                 updated_shift["updatedBy"] = user["userName"]
-                updated_shift["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
-                del updated_shift["id"]  # Remove id from the updated_shift
-                update_operations.append(UpdateOne({"_id": ObjectId(shift["id"])}, {"$set": updated_shift}))
-            self.db.shifts.bulk_write(update_operations)
-                
-            shifts = self.db.shifts.find({"company": company, "_id": {"$in": ids}})
+                updated_shift["updatedAt"] = datetime.datetime.now(
+                    pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+                del updated_shift["id"]
+                update_operations.append(
+                    UpdateOne({"_id": ObjectId(shift["id"])}, {"$set": updated_shift}))
+            self.database.shifts.bulk_write(update_operations)
+            shifts = self.database.shifts.find({"company": company_id, "_id": {"$in": ids}})
             return shifts
-        except Exception as e:
-            print(e)
-            raise errors["Update error"] from e
-        
-    
-    def deleteShifts(self, company: str, stallId: str, ids: List[str]) -> List[Shift]:
+        except PyMongoError as exception:
+            raise Error(f"Error updating shifts: {exception}") from exception
+
+    def delete_shifts(self, company: str, stall_id: str, shifts_ids: List[str]) -> List[Shift]:
+        """
+        Delete shifts.
+        Args:
+            company (str): Company id.
+            stall_id (str): Stall id.
+            shifts_ids (List[str]): Shifts ids.
+        Returns:
+            List[Shift]: Shifts.
+        Raises:
+            Exception: If there's an error deleting the shifts.
+        """
         try:
-            shifts = self.db.shifts.find({"company": company, "stall": stallId, "_id": {"$in": [ObjectId(id) for id in ids]}})
+            shifts = self.database.shifts.find(
+                {"company": company, "stall": stall_id, "_id": {"$in":
+                    [ObjectId(id) for id in shifts_ids]}})
             if not shifts:
-                return errors["Deletion error"]
-            self.db.shifts.delete_many({"company": company, "stall": stallId, "_id": {"$in": [ObjectId(id) for id in ids]}})
+                raise Error("Shifts not found")
+            self.database.shifts.delete_many(
+                {"company": company, "stall": stall_id, "_id": {"$in":
+                    [ObjectId(id) for id in shifts_ids]}})
             return shifts or []
-        except Exception as e:
-            raise errors["Deletion error"] from e
+        except PyMongoError as exception:
+            raise Error(f"Error deleting shifts: {exception}") from exception

@@ -1,4 +1,7 @@
-def ShiftEntity(shift) -> dict:
+"""Shift schemas."""
+
+def shift_entity(shift) -> dict:
+    """Shift entity."""
     return {
         "id": str(shift["_id"]),
         "day": shift["day"],
@@ -21,6 +24,7 @@ def ShiftEntity(shift) -> dict:
         "createdAt": shift["createdAt"],
         "updatedAt": shift["updatedAt"]
     }
-    
-def ShiftsEntity(shifts) -> list:
-    return [ShiftEntity(shift) for shift in shifts]
+
+def shifts_entity(shifts) -> list:
+    """Shifts entity."""
+    return [shift_entity(shift) for shift in shifts]

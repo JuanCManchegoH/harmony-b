@@ -1,6 +1,9 @@
-from schemas.shift import ShiftEntity
+"""Stall schemas."""
 
-def StallEntity(stall) -> dict:
+from schemas.shift import shift_entity
+
+def stall_entity(stall) -> dict:
+    """Stall entity."""
     return {
         "id": str(stall["_id"]),
         "name": stall["name"],
@@ -19,9 +22,10 @@ def StallEntity(stall) -> dict:
         "createdAt": stall["createdAt"],
         "updatedAt": stall["updatedAt"]
     }
-    
-def StallsAndShifts(stalls, shifts) -> dict:
+
+def stalls_and_shifts(stalls, shifts) -> dict:
+    """Stalls and shifts entity."""
     return {
-        "stalls": [StallEntity(stall) for stall in stalls],
-        "shifts": [ShiftEntity(shift) for shift in shifts]
+        "stalls": [stall_entity(stall) for stall in stalls],
+        "shifts": [shift_entity(shift) for shift in shifts]
     }

@@ -1,99 +1,126 @@
+"""Shifts router module."""
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.encoders import jsonable_encoder
+from pymongo.database import Database
 from db.client import db_client
-from schemas.stall import StallEntity
+# from schemas.stall import stall_entity
+from schemas.shift import shift_entity
 from services.users import UsersServices
 from services.companies import CompaniesServices
 from services.shifts import ShiftsServices
 from services.stalls import StallsServices
-from services.websocket import manager
+# from services.websocket import manager
 from services.logs import LogsServices
-from models.shift import CreateAndUpdateShifts, DeleteShifts
-from models.websocket import WebsocketResponse
-from schemas.shift import ShiftsEntity
-from utils.auth import decodeAccessToken
+from models.shift import GetShifts, CreateShifts, UpdateShifts, DeleteShifts
+# from models.websocket import WebsocketResponse
+from utils.auth import decode_access_token
 from utils.roles import allowed_roles
-from typing import List
 
 shifts = APIRouter(prefix='/shifts', tags=['Shifts'], responses={404: {"description": "Not found"}})
-harmony = db_client["harmony"]
+database = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+users_services = UsersServices(database)
+companies_services = CompaniesServices(database)
+def stalls_services(company_db: Database):
+    """Stalls services."""
+    return StallsServices(company_db)
+def shifts_services(company_db: Database):
+    """Shifts services."""
+    return ShiftsServices(company_db)
+def logs_services(company_db: Database):
+    """Logs services."""
+    return LogsServices(company_db)
 
-# create and update shifts
-@shifts.put(path="", summary="Create and update shifts", description="This endpoint creates and updates shifts in the database and returns the shifts object.", status_code=201)
-async def createAndUpdateShifts(shifts: CreateAndUpdateShifts, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@shifts.post(path='', summary='Create shifts', description='Create shifts', status_code=201)
+async def create_shifts(data: CreateShifts, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Create shifts."""
     # Validations
-    token = decodeAccessToken(token)
-    allowed_roles(token["roles"], ["handle_shifts", "admin"])
-    # Create and update shifts
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    if len(shifts.create) > 0:
-        createResult = ShiftsServices(companyDb).createShifts(user["company"], shifts.create, user)
-    else:
-        createResult = []
-    if len(shifts.update) > 0:
-        updateResult = ShiftsServices(companyDb).updateShifts(user["company"], shifts.update, user)
-    else:
-        updateResult = []
-    if shifts.appliedSequence:
-        appliedSequence = dict(shifts.appliedSequence)
-        steps = [dict(step) for step in appliedSequence["sequence"]]
-        data = {
-            "sequence": steps,
-            "index": appliedSequence["index"],
-            "jump": appliedSequence["jump"]
-        }
-        stall = StallsServices(companyDb).updateStallWorker(appliedSequence["stall"], appliedSequence["worker"], data, user)  
-    else:
-        stall = {}
-    print(stall)
-    result = {
-        "created": ShiftsEntity(createResult),
-        "updated": ShiftsEntity(updateResult),
-        # "stall": StallEntity(stall) if shifts.appliedSequence else None
-    }
-    # Websocket
-    # message = WebsocketResponse(event="shifts_created_and_updated", data=result, userName=user["userName"], company=user["company"])
-    # await manager.broadcast(message)
+    token = decode_access_token(token)
+    allowed_roles(token["roles"], ["admin", "manager"])
+    # Encode shifts
+    shifts_to_create = jsonable_encoder(data.shifts)
+    # Create shifts
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = shifts_services(company_db).create_shifts(user["company"], shifts_to_create, user)
+    result = [shift_entity(shift) for shift in result]
     # Log
-    _ = LogsServices(companyDb).createLog({
+    _ = logs_services(company_db).create_log({
+        "user": user["userName"],
         "company": user["company"],
-        "user": user["email"],
-        "userName": user["userName"],
-        "type": "Turnos",
-        "message": f"El usuario {user['userName']} ha creado y/o actualizado turnos"
-    })
-    # Return
-    return result
+        "action": "create_shifts",
+        "data": shifts})
+    return JSONResponse(status_code=201, content=result)
 
-# delete shifts
-@shifts.post(path="/delete/{stallId}", summary="Delete shifts", description="This endpoint deletes shifts in the database and returns the shifts object.", status_code=200)
-async def deleteShifts(stallId: str, data:DeleteShifts, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@shifts.get(path='', summary='Get shifts', description='Get shifts', status_code=200)
+async def get_shifts(
+    data: GetShifts,
+    token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Get shifts."""
     # Validations
-    token = decodeAccessToken(token)
-    allowed_roles(token["roles"], ["handle_shifts", "admin"])
+    token = decode_access_token(token)
+    allowed_roles(token["roles"], ["admin", "manager", "worker"])
+    # Get shifts
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    shifts_to_get = shifts_services(company_db).get_shifts_by_month_and_year(
+        user["company"],
+        data.months,
+        data.years,
+        data.types)
+    shifts_to_get = [shift_entity(shift) for shift in shifts_to_get]
+    return JSONResponse(status_code=200, content=shifts)
+
+@shifts.put(path='', summary='Update shifts', description='Update shifts', status_code=200)
+async def update_shifts(data: UpdateShifts, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Update shifts."""
+    # Validations
+    token = decode_access_token(token)
+    allowed_roles(token["roles"], ["admin", "manager"])
+    # Encode shifts
+    shifts_to_update = jsonable_encoder(data.shifts)
+    # Update shifts
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = shifts_services(company_db).update_shifts(user["company"], shifts_to_update, user)
+    result = [shift_entity(shift) for shift in result]
+    # Log
+    _ = logs_services(company_db).create_log({
+        "user": user["userName"],
+        "company": user["company"],
+        "action": "update_shifts",
+        "data": shifts})
+    return JSONResponse(status_code=200, content=result)
+
+@shifts.delete(
+    path='/{stall_id}',
+    summary='Delete shifts',
+    description='Delete shifts',
+    status_code=200)
+async def delete_shifts(
+    stall_id: str,
+    data: DeleteShifts,
+    token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Delete shifts."""
+    # Validations
+    token = decode_access_token(token)
+    allowed_roles(token["roles"], ["admin", "manager"])
     # Delete shifts
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    print(data.shifts)
-    result = ShiftsServices(companyDb).deleteShifts(user["company"], stallId, data.shifts)
-    result = ShiftsEntity(result)
-    # Websocket
-    # message = WebsocketResponse(event="shifts_deleted", data=result, userName=user["userName"], company=user["company"])
-    # await manager.broadcast(message)\
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = shifts_services(company_db).delete_shifts(user["company"], stall_id, data.shifts)
+    result = [shift_entity(shift) for shift in result]
     # Log
-    stall = StallsServices(companyDb).findStall(stallId)
-    stall = dict(stall)
-    _ = LogsServices(companyDb).createLog({
+    _ = logs_services(company_db).create_log({
+        "user": user["userName"],
         "company": user["company"],
-        "user": user["email"],
-        "userName": user["userName"],
-        "type": "Turnos",
-        "message": f"El usuario {user['userName']} ha eliminado turnos en el puesto {stall['name']}. Cliente: {stall['customerName']}"
-    })
-    # Return
-    return result
+        "action": "delete_shifts",
+        "data": data.shifts})
+    return JSONResponse(status_code=200, content=result)

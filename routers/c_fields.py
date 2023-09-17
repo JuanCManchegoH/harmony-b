@@ -66,7 +66,7 @@ async def add_cfield(field: Field, token: str = Depends(oauth2_scheme)) -> JSONR
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
 @cfields.put(
-    path="/{fieldId}",
+    path="/{field_id}",
     summary="Update a customer field",
     description="Update a customer field from a company",
     status_code=status.HTTP_200_OK)
@@ -104,7 +104,7 @@ async def update_cfield(
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
 @cfields.delete(
-    path="/{fieldId}",
+    path="/{field_id}",
     summary="Delete a customer field",
     description="Delete a customer field from a company",
     status_code=status.HTTP_200_OK)

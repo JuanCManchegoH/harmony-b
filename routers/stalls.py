@@ -1,182 +1,274 @@
-from typing import List
+"""Stalls router module."""
+
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.encoders import jsonable_encoder
+from pymongo.database import Database
 from db.client import db_client
-from models.shift import DeleteShifts
-from services.users import UsersServices
 from services.companies import CompaniesServices
+from services.users import UsersServices
 from services.stalls import StallsServices
 from services.websocket import manager
+from services.workers import WorkersServices
 from services.logs import LogsServices
+from models.shift import DeleteShifts
 from models.stall import GetStalls, Stall, StallWorker, UpdateStall
 from models.websocket import WebsocketResponse
-from schemas.stall import StallEntity, StallsAndShifts
-from services.workers import WorkersServices
-from utils.auth import decodeAccessToken
+from schemas.stall import stall_entity, stalls_and_shifts
+from utils.auth import decode_access_token
 from utils.roles import allowed_roles
 
 stalls = APIRouter(prefix='/stalls', tags=['Stalls'], responses={404: {"description": "Not found"}})
-harmony = db_client["harmony"]
+database = db_client["harmony"]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+companies_services = CompaniesServices(database)
+users_services = UsersServices(database)
+def stalls_services(company_db: Database):
+    """Stalls services."""
+    return StallsServices(company_db)
+def workers_services(company_db: Database):
+    """Workers services."""
+    return WorkersServices(company_db)
+def logs_services(company_db: Database):
+    """Logs services."""
+    return LogsServices(company_db)
 
-# create a stall
-@stalls.post(path="", summary="Create a stall", description="This endpoint creates a stall in the database and returns the stall object.", status_code=201)
-async def createStall(stall: Stall, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+
+@stalls.post(
+    path="",
+    summary="Create a stall",
+    description="This endpoint creates a stall in the database and returns the stall object.",
+    status_code=201)
+async def create_stall(stall: Stall, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Create a stall."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["handle_stalls", "admin"])
+    # Encode stall
+    stall = jsonable_encoder(stall)
     # Create stall
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = StallsServices(companyDb).createStall(stall, user)
-    result = StallEntity(result)
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = stalls_services(company_db).create_stall(stall, user)
+    result = stall_entity(result)
     # Websocket
-    message = WebsocketResponse(event="stall_created", data=result, userName=user["userName"], company=user["company"])
+    message = WebsocketResponse(
+        event="stall_created",
+        data=result,
+        userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    _ = LogsServices(companyDb).createLog({
+    message = (
+        f"El usuario {user['userName']} ha creado el puesto {result['name']}. "
+        f"Cliente: {result['customerName']}")
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
         "type": "Puestos",
-        "message": f"El usuario {user['userName']} ha creado el puesto {result['name']}. Cliente: {result['customerName']}"
+        "message": message
     })
     # Return
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
 
-# find stalls by customer
-@stalls.post(path="/getByCustomer", summary="Find all stalls", description="This endpoint returns all stalls", status_code=200)
-async def finsCustomerStalls(data: GetStalls, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@stalls.post(
+    path="/getByCustomer",
+    summary="Find all stalls",
+    description="This endpoint returns all stalls",
+    status_code=200)
+async def get_customer_stalls(data: GetStalls, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Find all stalls."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["read_stalls", "admin"])
     # Find all stalls
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = StallsServices(companyDb).findCustomerStalls(user["company"], data.customerId, data.months, data.years)
-    result = StallsAndShifts(result["stalls"], result["shifts"])
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = stalls_services(company_db).get_customer_stalls(
+        user["company"], data.customerId, data.months, data.years, data.types)
+    result = stalls_and_shifts(result["stalls"], result["shifts"])
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
-# find stalls by customers
-@stalls.post(path="/getByCustomers", summary="Find all stalls", description="This endpoint returns all stalls", status_code=200)
-async def finsCustomersStalls(data: GetStalls, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@stalls.post(
+    path="/getByCustomers",
+    summary="Find all stalls",
+    description="This endpoint returns all stalls",
+    status_code=200)
+async def get_customers_stalls(
+    data: GetStalls, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Find all stalls."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["read_stalls", "admin"])
     # Find all stalls
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = StallsServices(companyDb).findStalls(user["company"], data.months, data.years)
-    result = StallsAndShifts(result["stalls"], result["shifts"])
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = stalls_services(company_db).get_stalls(
+        user["company"], data.months, data.years, data.types)
+    result = stalls_and_shifts(result["stalls"], result["shifts"])
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
-# update a stall
-@stalls.put(path="/{id}", summary="Update a stall", description="This endpoint updates a stall in the database and returns the stall object.", status_code=200)
-async def updateStall(id: str, data: UpdateStall, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+@stalls.put(
+    path="/{stall_id}",
+    summary="Update a stall",
+    description="This endpoint updates a stall in the database and returns the stall object.",
+    status_code=200)
+async def update_stall(
+    stall_id: str, data: UpdateStall, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Update a stall."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["handle_stalls", "admin"])
+    # Encode stall
+    data = jsonable_encoder(data)
     # Update stall
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = StallsServices(companyDb).updateStall(id, data, user)
-    result = StallEntity(result)
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = stalls_services(company_db).update_stall(stall_id, data, user)
+    result = stall_entity(result)
     # Websocket
-    message = WebsocketResponse(event="stall_updated", data=result, userName=user["userName"], company=user["company"])
+    message = WebsocketResponse(
+        event="stall_updated",
+        data=result,
+        userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    _ = LogsServices(companyDb).createLog({
+    message = (
+        f"El usuario {user['userName']} ha actualizado el puesto {result['name']}. "
+        f"Cliente: {result['customerName']}")
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
         "type": "Puestos",
-        "message": f"El usuario {user['userName']} ha actualizado el puesto {result['name']}. Cliente: {result['customerName']}"
+        "message": message
     })
     # Return
     return result
 
-# delete a stall
-@stalls.post(path="/{id}", summary="Delete a stall", description="This endpoint deletes a stall in the database and returns the stall object.", status_code=200)
-async def deleteStall(id: str, data: DeleteShifts, token: str = Depends(oauth2_scheme)):
+@stalls.post(
+    path="/{stall_id}",
+    summary="Delete a stall",
+    description="This endpoint deletes a stall in the database and returns the stall object.",
+    status_code=200)
+async def delete_stall(stall_id: str, data: DeleteShifts, token: str = Depends(oauth2_scheme)):
+    """Delete a stall."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["handle_stalls", "admin"])
     # Delete stall
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = StallsServices(companyDb).deleteStall(user["company"], id, data.shifts)
-    result = StallEntity(result)
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = stalls_services(company_db).delete_stall(user["company"], stall_id, data.shifts)
+    result = stall_entity(result)
     # Websocket
-    message = WebsocketResponse(event="stall_deleted", data=result, userName=user["userName"], company=user["company"])
+    message = WebsocketResponse(
+        event="stall_deleted",
+        data=result, userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    _ = LogsServices(companyDb).createLog({
+    message = (
+        f"El usuario {user['userName']} ha eliminado el puesto {result['name']}. "
+        f"Cliente: {result['customerName']}")
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
         "type": "Puestos",
-        "message": f"El usuario {user['userName']} ha eliminado el puesto {result['name']}. Cliente: {result['customerName']}"
+        "message": message
     })
     # Return
     return result
 
-# Stall worker
-@stalls.post(path="/addWorker/{id}", summary="Add a worker to a stall", description="This endpoint adds a worker to a stall in the database and returns the stall object.", status_code=200)
-async def addStallWorker(id: str, worker: StallWorker, token: str = Depends(oauth2_scheme)):
+@stalls.post(
+    path="/addWorker/{stall_id}",
+    summary="Add a worker to a stall",
+    description=
+    "This endpoint adds a worker to a stall in the database and returns the stall object.",
+    status_code=200)
+async def add_stall_worker(
+    stall_id: str, worker: StallWorker, token: str = Depends(oauth2_scheme)):
+    """Add a worker to a stall."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["handle_stalls", "admin"])
+    # Encode stall worker
+    worker = jsonable_encoder(worker)
     # Create stall worker
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = StallsServices(companyDb).addStallWorker(id, worker, user)
-    result = StallEntity(result)
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = stalls_services(company_db).add_stall_worker(stall_id, worker, user)
+    result = stall_entity(result)
     # Websocket
-    message = WebsocketResponse(event="stall_updated", data=result, userName=user["userName"], company=user["company"])
+    message = WebsocketResponse(
+        event="stall_updated",
+        data=result,
+        userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
     worker =  dict(worker)
-    worker = WorkersServices(companyDb).findWorkerById(user["company"], worker["id"])
-    _ = LogsServices(companyDb).createLog({
+    worker = workers_services(company_db).get_worker_by_id(user["company"], worker["id"])
+    message = (
+        f"El usuario {user['userName']} ha asignado a {worker['name']} al puesto {result['name']}. "
+        f"Cliente: {result['customerName']}")
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
         "type": "Puestos",
-        "message": f"El usuario {user['userName']} ha asignado a {worker['name']} al puesto {result['name']}, cliente: {result['customerName']}"
+        "message": message
     })
     # Return
     return result
 
-@stalls.post(path="/removeWorker/{id}/{workerId}", summary="Remove a worker from a stall", description="This endpoint removes a worker from a stall in the database and returns the stall object.", status_code=200)
-async def removeWorker(id: str, workerId: str, data: DeleteShifts, token: str = Depends(oauth2_scheme)):
+@stalls.post(
+    path="/removeWorker/{stall_id}/{worker_id}",
+    summary="Remove a worker from a stall",
+    description=
+    "This endpoint removes a worker from a stall",
+    status_code=200)
+async def remove_worker(
+    stall_id: str, worker_id: str, data: DeleteShifts, token: str = Depends(oauth2_scheme)):
+    """Remove a worker from a stall."""
     # Validations
-    token = decodeAccessToken(token)
+    token = decode_access_token(token)
     allowed_roles(token["roles"], ["handle_stalls", "admin"])
     # Delete stall worker
-    user = UsersServices(harmony).getByEmail(token["email"])
-    company = CompaniesServices(harmony).getCompany(user["company"])
-    companyDb = db_client[company["db"]]
-    result = StallsServices(companyDb).removeWorker(user["company"], id, workerId, data.shifts)
-    result = StallEntity(result)
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = stalls_services(company_db).remove_worker(
+        user["company"], stall_id, worker_id, data.shifts)
+    result = stall_entity(result)
     # Websocket
-    message = WebsocketResponse(event="stall_updated", data=result, userName=user["userName"], company=user["company"])
+    message = WebsocketResponse(
+        event="stall_updated",
+        data=result,
+        userName=user["userName"],
+        company=user["company"])
     await manager.broadcast(message)
     # Log
-    worker = WorkersServices(companyDb).findWorkerById(user["company"], workerId)
-    _ = LogsServices(companyDb).createLog({
+    worker = workers_services(company_db).get_worker_by_id(user["company"], worker_id)
+    message = (
+        f"El usuario {user['userName']} ha eliminado a {worker['name']}, puesto {result['name']}. "
+        f"Cliente: {result['customerName']}")
+    _ = logs_services(company_db).create_log({
         "company": user["company"],
         "user": user["email"],
         "userName": user["userName"],
         "type": "Puestos",
-        "message": f"El usuario {user['userName']} ha desasignado a {worker['name']} del puesto {result['name']}. Cliente: {result['customerName']}"
+        "message": message
     })
     # Return
     return result
-    

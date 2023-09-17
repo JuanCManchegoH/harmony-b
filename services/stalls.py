@@ -1,140 +1,278 @@
+"""Stalls services module."""
+
 import datetime
+from typing import List
 import pytz
 from pymongo.database import Database
-from models.stall import Stall, UpdateStall, StallWorker, StallsAndShifts, UpdateStallWorker
-from schemas.user import UserEntity
+from pymongo.errors import PyMongoError
 from bson.objectid import ObjectId
+from models.stall import Stall, UpdateStall, StallWorker, StallsAndShifts, UpdateStallWorker
+from schemas.user import user_entity
 from .shifts import ShiftsServices
-from utils.errorsResponses import errors
-from typing import List
+
+class Error(Exception):
+    """Base class for exceptions in this module."""
 
 class StallsServices():
-    def __init__(self, db: Database) -> None:
-        self.db = db
-        
-    def createStall(self, stall: Stall, user: UserEntity) -> Stall:
+    """Stalls services class."""
+    def __init__(self, database: Database) -> None:
+        self.database = database
+
+    def create_stall(self, stall: Stall, user: user_entity) -> Stall:
+        """
+        Create a stall.
+        Args:
+            stall (Stall): Stall to create.
+            user (user_entity): User.
+        Returns:
+            Stall: Created stall.
+        Raises:
+            Exception: If there's an error creating the stall.
+        """
         try:
-            stall = dict(stall)
             del stall["id"]
             stall["createdBy"] = user["userName"]
             stall["updatedBy"] = user["userName"]
-            stall["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
-            stall["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
-            stall = self.db.stalls.insert_one(stall)
-            stall = self.db.stalls.find_one({"_id": stall.inserted_id})
-            return stall or {}
-        except Exception as e:
-            raise errors["Creation error"] from e
-        
-    def findStall(self, id: str) -> Stall:
+            stall["createdAt"] = datetime.datetime.now(
+                pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+            stall["updatedAt"] = datetime.datetime.now(
+                pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+            stall = self.database.stalls.insert_one(stall)
+            stall = self.database.stalls.find_one({"_id": stall.inserted_id})
+            return stall
+        except PyMongoError as exception:
+            raise Error(f"Error creating stall: {exception}") from exception
+
+    def get_stall(self, stall_id: str) -> Stall:
+        """
+        Find a stall.
+        Args:
+            stall_id (str): Stall id.
+        Returns:
+            Stall: Stall.
+        Raises:
+            Exception: If there's an error reading the stall.
+        """
         try:
-            stall = self.db.stalls.find_one({"_id": ObjectId(id)})
-            return stall or {}
-        except Exception as e:
-            raise errors["Read error"] from e
-        
-    def findStalls(self, company: str, months: List[str], years: List[str]) -> StallsAndShifts:
+            stall = self.database.stalls.find_one({"_id": ObjectId(stall_id)})
+            return stall
+        except PyMongoError as exception:
+            raise Error(f"Error reading stall: {exception}") from exception
+
+    def get_stalls(
+        self,
+        company: str,
+        months: List[str],
+        years: List[str],
+        types: List[str]) -> StallsAndShifts:
+        """
+        Find stalls.
+        Args:
+            company (str): Company id.
+            months (List[str]): Months.
+            years (List[str]): Years.
+            types (List[str]): Shift types.
+        Returns:
+            StallsAndShifts: Stalls and shifts.
+        Raises:
+            Exception: If there's an error reading the stalls.
+        """
         try:
-            stalls = self.db.stalls.find({"month": {"$in": months}, "year": {"$in": years}})
+            stalls = self.database.stalls.find({"month": {"$in": months}, "year": {"$in": years}})
             stalls = [dict(stall) for stall in stalls]
-            customers = list()
+            shifts = ShiftsServices(self.database).get_shifts_by_month_and_year(
+                company,
+                months,
+                years,
+                types)
+            shifts = [dict(shift) for shift in shifts]
+            result = {"stalls": stalls, "shifts": shifts}
+            return result
+        except PyMongoError as exception:
+            raise Error(f"Error reading stalls: {exception}") from exception
+
+    def get_customer_stalls(
+        self,
+        company: str,
+        customer: str,
+        months: List[str],
+        years: List[str],
+        types: List[str]) -> StallsAndShifts:
+        """
+        Find stalls.
+        Args:
+            company (str): Company id.
+            customer (str): Customer id.
+            months (List[str]): Months.
+            years (List[str]): Years.
+            types (List[str]): Shift types.
+        Returns:
+            StallsAndShifts: Stalls and shifts.
+        Raises:
+            Exception: If there's an error reading the stalls.
+        """
+        try:
+            stalls = self.database.stalls.find(
+                {"customer": customer, "month": {"$in": months}, "year": {"$in": years}})
+            stalls = [dict(stall) for stall in stalls]
+            workers = list()
             for stall in stalls:
-                if stall["customer"] not in customers:
-                    customers.append(stall["customer"])
-            shifts = ShiftsServices(self.db).findShiftsByCustomers(company, [str(stall["_id"]) for stall in stalls], customers)
+                for worker in stall["workers"]:
+                    if worker["id"] not in workers:
+                        workers.append(worker["id"])
+            shifts = ShiftsServices(self.database).get_shifts_by_workers(
+                company, [str(worker["id"]) for worker in workers], types)
             shifts = [dict(shift) for shift in shifts]
             result = {"stalls": stalls, "shifts": shifts}
-            return result or {}
-        except Exception as e:
-            raise errors["Read error"] from e
-    
-    def findCustomerStalls(self, company: str, customer: str, months: List[str], years: List[str]) -> StallsAndShifts:
+            return result
+        except PyMongoError as exception:
+            raise Error(f"Error reading stalls: {exception}") from exception
+
+    def update_stall(self, stall_id: str, data: UpdateStall, user: user_entity) -> Stall:
+        """
+        Update a stall.
+        Args:
+            stall_id (str): Stall id.
+            data (UpdateStall): Stall data to update.
+            user (user_entity): User.
+        Returns:
+            Stall: Updated stall.
+        Raises:
+            Exception: If there's an error updating the stall.
+        """
         try:
-            stalls = self.db.stalls.find({"customer": customer, "month": {"$in": months}, "year": {"$in": years}})
-            stalls = [dict(stall) for stall in stalls]
-            shifts = ShiftsServices(self.db).findShiftsByCustomer(company, [str(stall["_id"]) for stall in stalls], customer)
-            shifts = [dict(shift) for shift in shifts]
-            result = {"stalls": stalls, "shifts": shifts}
-            return result or {}
-        except Exception as e:
-            raise errors["Read error"] from e
-    
-    def updateStall(self, id: str, data: UpdateStall, user: UserEntity) -> Stall:
-        try:
-            stall = self.db.stalls.find_one({"_id": ObjectId(id)})
+            stall = self.database.stalls.find_one({"_id": ObjectId(stall_id)})
             if not stall:
-                return errors["Update error"]
+                raise Error("Stall not found")
             stall = dict(stall)
-            data = dict(data)
-            data["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+            data["updatedAt"] = datetime.datetime.now(
+                pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
             data["updatedBy"] = user["userName"]
-            self.db.stalls.update_one({"_id": ObjectId(id)}, {"$set": data})
-            stall = self.db.stalls.find_one({"_id": ObjectId(id)})
+            self.database.stalls.update_one({"_id": ObjectId(stall_id)}, {"$set": data})
+            stall = self.database.stalls.find_one({"_id": ObjectId(stall_id)})
             return stall or {}
-        except Exception as e:
-            raise errors["Update error"] from e
-    
-    def deleteStall(self, company: str, id: str, shifts: List[str]) -> StallsAndShifts:
+        except PyMongoError as exception:
+            raise Error(f"Error updating stall: {exception}") from exception
+
+    def delete_stall(self, company_id: str, stall_id: str, shifts: List[str]) -> StallsAndShifts:
+        """
+        Delete a stall.
+        Args:
+            company_id (str): Company id.
+            stall_id (str): Stall id.
+            shifts (List[str]): Shifts ids.
+        Returns:
+            StallsAndShifts: Stalls and shifts.
+        Raises:
+            Exception: If there's an error deleting the stall.
+        """
         try:
-            stall = self.db.stalls.find_one({"_id": ObjectId(id)})
+            stall = self.database.stalls.find_one({"_id": ObjectId(stall_id)})
             if not stall:
-                raise errors["Deletion error"]
+                raise Error("Stall not found")
             stall = dict(stall)
-            self.db.stalls.delete_one({"_id": ObjectId(id)})
-            shifts = ShiftsServices.deleteShifts(self, company, id, shifts)
-            return stall or {}
-        except Exception as e:
-            raise errors["Deletion error"] from e
-    
+            self.database.stalls.delete_one({"_id": ObjectId(stall_id)})
+            shifts = ShiftsServices.delete_shifts(self, company_id, stall_id, shifts)
+            return stall
+        except PyMongoError as exception:
+            raise Error(f"Error deleting stall: {exception}") from exception
+
     # Stall workers
-    def addStallWorker(self, id: str, worker: StallWorker, user: UserEntity) -> Stall:
+    def add_stall_worker(self, stall_id: str, worker: StallWorker, user: user_entity) -> Stall:
+        """
+        Add a stall worker.
+        Args:
+            stall_id (str): Stall id.
+            worker (StallWorker): Stall worker.
+            user (user_entity): User.
+        Returns:
+            Stall: Stall.
+        Raises:
+            Exception: If there's an error adding the worker.
+        """
         try:
             worker = dict(worker)
             worker["createdBy"] = user["userName"]
             worker["updatedBy"] = user["userName"]
-            worker["createdAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
-            worker["updatedAt"] = datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
-            stall = self.db.stalls.find_one({"_id": ObjectId(id)})
+            worker["createdAt"] = datetime.datetime.now(
+                pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+            worker["updatedAt"] = datetime.datetime.now(
+                pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+            stall = self.database.stalls.find_one({"_id": ObjectId(stall_id)})
             if not stall:
-                return errors["Update error"]
-            self.db.stalls.update_one({"_id": ObjectId(id)}, {"$push": {"workers": worker}})
-            stall = self.db.stalls.find_one({"_id": ObjectId(id)})
-            return stall or {}
-        except Exception as e:
-            raise errors["Update error"] from e
-        
-    def updateStallWorker(self, id: str, workerId: str, data: UpdateStallWorker, user: UserEntity) -> Stall:
+                raise Error("Stall not found")
+            self.database.stalls.update_one(
+                {"_id": ObjectId(stall_id)}, {"$push": {"workers": worker}})
+            stall = self.database.stalls.find_one({"_id": ObjectId(stall_id)})
+            return stall
+        except PyMongoError as exception:
+            raise Error(f"Error adding worker: {exception}") from exception
+
+    def update_stall_worker(
+        self,
+        stall_id: str,
+        worker_id: str,
+        data: UpdateStallWorker,
+        user: user_entity) -> Stall:
+        """
+        Update a stall worker.
+        Args:
+            stall_id (str): Stall id.
+            worker_id (str): Worker id.
+            data (UpdateStallWorker): Stall worker data to update.
+            user (user_entity): User.
+        Returns:
+            Stall: Updated stall.
+        Raises:
+            Exception: If there's an error updating the worker.
+        """
         try:
             update_data = {
                 "workers.$.sequence": data["sequence"],
                 "workers.$.index": data["index"],
                 "workers.$.jump": data["jump"],
-                "workers.$.updatedAt": datetime.datetime.now(pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M"),
-                "workers.$.updatedBy": user["userName"]
+                "workers.$.updatedAt": datetime.datetime.now(
+                    pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M"),
+                "workers.$.updatedatabasey": user["userName"]
             }
-
-            result = self.db.stalls.update_one(
-                {"_id": ObjectId(id), "workers.id": workerId},
+            result = self.database.stalls.update_one(
+                {"_id": ObjectId(stall_id), "workers.id": worker_id},
                 {"$set": update_data}
             )
-
             if result.modified_count == 0:
-                return errors["Update error"]
+                raise Error("Worker not found")
+            stall = self.database.stalls.find_one({"_id": ObjectId(stall_id)})
+            return stall
+        except PyMongoError as exception:
+            raise Error(f"Error updating worker: {exception}") from exception
 
-            stall = self.db.stalls.find_one({"_id": ObjectId(id)})
-            return stall or {}
-        except Exception as e:
-            raise errors["Update error"] from e
-    
-    def removeWorker(self, company: str, stallId: str, workerId: str, shifts: List[str]) -> Stall:
+    def remove_worker(
+        self,
+        company: str,
+        stall_id: str,
+        worker_id: str,
+        shifts: List[str]) -> Stall:
+        """
+        Remove a worker.
+        Args:
+            company (str): Company id.
+            stall_id (str): Stall id.
+            worker_id (str): Worker id.
+            shifts (List[str]): Shifts ids. 
+        Returns:
+            Stall: Stall.
+        Raises:
+            Exception: If there's an error removing the worker.
+        """
         try:
-            stall = self.db.stalls.find_one({"_id": ObjectId(stallId)})
+            stall = self.database.stalls.find_one({"_id": ObjectId(stall_id)})
             if not stall:
-                raise errors["Deletion error"]
+                raise Error("Stall not found")
             stall = dict(stall)
-            self.db.stalls.update_one({"_id": ObjectId(stallId)}, {"$pull": {"workers": {"id": workerId}}})
-            stall = self.db.stalls.find_one({"_id": ObjectId(stallId)})
-            shifts = ShiftsServices.deleteShifts(self, company, stallId, shifts)
-            return stall or {}
-        except Exception as e:
-            raise errors["Deletion error"] from e
+            self.database.stalls.update_one(
+                {"_id": ObjectId(stall_id)}, {"$pull": {"workers": {"id": worker_id}}})
+            stall = self.database.stalls.find_one({"_id": ObjectId(stall_id)})
+            shifts = ShiftsServices.delete_shifts(self, company, stall_id, shifts)
+            return stall
+        except PyMongoError as exception:
+            raise Error(f"Error removing worker: {exception}") from exception
