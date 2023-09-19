@@ -67,6 +67,35 @@ class ShiftsServices():
             return shifts
         except PyMongoError as exception:
             raise Error(f"Error finding shifts by customer: {exception}") from exception
+        
+    def get_by_customer_and_month_and_year(
+        self,
+        company: str,
+        customer: str,
+        months: List[str],
+        years: List[str],
+        types: List[str]) -> List[Shift]:
+        """
+        Get shifts by customer and month and year.
+        Args:
+            company (str): Company id.
+            customer (str): Customer id.
+            months (List[str]): Months.
+            years (List[str]): Years.
+            types (List[str]): Shift types.
+        Returns:
+            List[Shift]: Shifts.
+        Raises:
+            Exception: If there's an error finding the shifts.
+        """
+        try:
+            shifts = self.database.shifts.find(
+                {"company": company, "customer": customer, "month": {"$in": months},
+                 "year": {"$in": years}, "type": {"$in": types}})
+            return shifts
+        except PyMongoError as exception:
+            raise Error(
+                f"Error finding shifts by customer and month and year: {exception}") from exception
 
     def get_shifts_by_month_and_year(
         self,

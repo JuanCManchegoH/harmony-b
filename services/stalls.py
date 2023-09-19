@@ -61,10 +61,8 @@ class StallsServices():
 
     def get_stalls(
         self,
-        company: str,
         months: List[str],
-        years: List[str],
-        types: List[str]) -> StallsAndShifts:
+        years: List[str]) -> List[Stall]:
         """
         Find stalls.
         Args:
@@ -78,15 +76,8 @@ class StallsServices():
             Exception: If there's an error reading the stalls.
         """
         try:
-            stalls = self.database.stalls.find({"month": {"$in": months}, "year": {"$in": years}})
-            stalls = [dict(stall) for stall in stalls]
-            shifts = ShiftsServices(self.database).get_shifts_by_month_and_year(
-                company,
-                months,
-                years,
-                types)
-            shifts = [dict(shift) for shift in shifts]
-            result = {"stalls": stalls, "shifts": shifts}
+            result = self.database.stalls.find(
+                { "month": {"$in": months}, "year": {"$in": years}})
             return result
         except PyMongoError as exception:
             raise Error(f"Error reading stalls: {exception}") from exception
@@ -115,13 +106,8 @@ class StallsServices():
             stalls = self.database.stalls.find(
                 {"customer": customer, "month": {"$in": months}, "year": {"$in": years}})
             stalls = [dict(stall) for stall in stalls]
-            workers = list()
-            for stall in stalls:
-                for worker in stall["workers"]:
-                    if worker["id"] not in workers:
-                        workers.append(worker["id"])
-            shifts = ShiftsServices(self.database).get_shifts_by_workers(
-                company, [str(worker["id"]) for worker in workers], types)
+            shifts = ShiftsServices(self.database).get_by_customer_and_month_and_year(
+                company, customer, months, years, types)
             shifts = [dict(shift) for shift in shifts]
             result = {"stalls": stalls, "shifts": shifts}
             return result

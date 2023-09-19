@@ -59,6 +59,11 @@ class GetStalls(BaseModel):
     years: List[str]
     types: List[str]
     customerId: str = None
+    
+class GetOnlyStalls(BaseModel):
+    """Get only stalls model."""
+    months: List[str]
+    years: List[str]
 
 class StallsAndShifts(BaseModel):
     """Stalls and shifts model."""

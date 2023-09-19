@@ -35,7 +35,7 @@ def logs_services(company_db: Database):
     return LogsServices(company_db)
 
 @shifts.post(path='', summary='Create shifts', description='Create shifts', status_code=201)
-async def create_shifts(data: CreateShifts, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+async def create_shifts(data: CreateShifts , token: str = Depends(oauth2_scheme)) -> JSONResponse:
     """Create shifts."""
     # Validations
     token = decode_access_token(token)
@@ -47,16 +47,21 @@ async def create_shifts(data: CreateShifts, token: str = Depends(oauth2_scheme))
     company = companies_services.get_company(user["company"])
     company_db = db_client[company["db"]]
     result = shifts_services(company_db).create_shifts(user["company"], shifts_to_create, user)
+    # print(result)
     result = [shift_entity(shift) for shift in result]
     # Log
-    _ = logs_services(company_db).create_log({
-        "user": user["userName"],
-        "company": user["company"],
-        "action": "create_shifts",
-        "data": shifts})
+    # _ = logs_services(company_db).create_log({
+    #     "user": user["userName"],
+    #     "company": user["company"],
+    #     "action": "create_shifts",
+    #     "data": shifts})
     return JSONResponse(status_code=201, content=result)
 
-@shifts.get(path='', summary='Get shifts', description='Get shifts', status_code=200)
+@shifts.post(
+    path='/getByMonthsAndYears',
+    summary='Get shifts',
+    description='Get shifts',
+    status_code=200)
 async def get_shifts(
     data: GetShifts,
     token: str = Depends(oauth2_scheme)) -> JSONResponse:
@@ -68,13 +73,13 @@ async def get_shifts(
     user = users_services.get_by_email(token["email"])
     company = companies_services.get_company(user["company"])
     company_db = db_client[company["db"]]
-    shifts_to_get = shifts_services(company_db).get_shifts_by_month_and_year(
+    result = shifts_services(company_db).get_shifts_by_month_and_year(
         user["company"],
         data.months,
         data.years,
         data.types)
-    shifts_to_get = [shift_entity(shift) for shift in shifts_to_get]
-    return JSONResponse(status_code=200, content=shifts)
+    result = [shift_entity(shift) for shift in result]
+    return JSONResponse(status_code=200, content=result)
 
 @shifts.put(path='', summary='Update shifts', description='Update shifts', status_code=200)
 async def update_shifts(data: UpdateShifts, token: str = Depends(oauth2_scheme)) -> JSONResponse:
@@ -91,15 +96,15 @@ async def update_shifts(data: UpdateShifts, token: str = Depends(oauth2_scheme))
     result = shifts_services(company_db).update_shifts(user["company"], shifts_to_update, user)
     result = [shift_entity(shift) for shift in result]
     # Log
-    _ = logs_services(company_db).create_log({
-        "user": user["userName"],
-        "company": user["company"],
-        "action": "update_shifts",
-        "data": shifts})
+    # _ = logs_services(company_db).create_log({
+    #     "user": user["userName"],
+    #     "company": user["company"],
+    #     "action": "update_shifts",
+    #     "data": shifts})
     return JSONResponse(status_code=200, content=result)
 
-@shifts.delete(
-    path='/{stall_id}',
+@shifts.post(
+    path='/delete/{stall_id}',
     summary='Delete shifts',
     description='Delete shifts',
     status_code=200)

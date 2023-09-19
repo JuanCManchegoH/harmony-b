@@ -13,9 +13,9 @@ from services.websocket import manager
 from services.workers import WorkersServices
 from services.logs import LogsServices
 from models.shift import DeleteShifts
-from models.stall import GetStalls, Stall, StallWorker, UpdateStall
+from models.stall import GetOnlyStalls, GetStalls, Stall, StallWorker, UpdateStall, UpdateStallWorker
 from models.websocket import WebsocketResponse
-from schemas.stall import stall_entity, stalls_and_shifts
+from schemas.stall import stall_entity, stalls_entity, stalls_and_shifts
 from utils.auth import decode_access_token
 from utils.roles import allowed_roles
 
@@ -94,12 +94,12 @@ async def get_customer_stalls(data: GetStalls, token: str = Depends(oauth2_schem
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
 @stalls.post(
-    path="/getByCustomers",
+    path="/getByMonthsAndYears",
     summary="Find all stalls",
     description="This endpoint returns all stalls",
     status_code=200)
 async def get_customers_stalls(
-    data: GetStalls, token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    data: GetOnlyStalls, token: str = Depends(oauth2_scheme)) -> JSONResponse:
     """Find all stalls."""
     # Validations
     token = decode_access_token(token)
@@ -108,9 +108,8 @@ async def get_customers_stalls(
     user = users_services.get_by_email(token["email"])
     company = companies_services.get_company(user["company"])
     company_db = db_client[company["db"]]
-    result = stalls_services(company_db).get_stalls(
-        user["company"], data.months, data.years, data.types)
-    result = stalls_and_shifts(result["stalls"], result["shifts"])
+    result = stalls_services(company_db).get_stalls(data.months, data.years)
+    result = stalls_entity(result)
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
 @stalls.put(
@@ -151,7 +150,7 @@ async def update_stall(
         "message": message
     })
     # Return
-    return result
+    return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
 @stalls.post(
     path="/{stall_id}",
@@ -187,7 +186,7 @@ async def delete_stall(stall_id: str, data: DeleteShifts, token: str = Depends(o
         "message": message
     })
     # Return
-    return result
+    return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
 @stalls.post(
     path="/addWorker/{stall_id}",
@@ -230,7 +229,49 @@ async def add_stall_worker(
         "message": message
     })
     # Return
-    return result
+    return JSONResponse(status_code=status.HTTP_200_OK, content=result)
+
+@stalls.put(
+    path="/updateWorker/{stall_id}/{worker_id}",
+    summary="Update a stall worker",
+    description=
+    "This endpoint updates a stall worker in the database and returns the stall object.",
+    status_code=200)
+async def update_stall_worker(
+    stall_id: str, worker_id: str, data: UpdateStallWorker, token: str = Depends(oauth2_scheme)):
+    """Update a stall worker."""
+    # Validations
+    token = decode_access_token(token)
+    allowed_roles(token["roles"], ["handle_stalls", "admin"])
+    # Encode stall worker
+    data = jsonable_encoder(data)
+    # Update stall worker
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    result = stalls_services(company_db).update_stall_worker(stall_id, worker_id, data, user)
+    result = stall_entity(result)
+    # Websocket
+    message = WebsocketResponse(
+        event="stall_updated",
+        data=result,
+        userName=user["userName"],
+        company=user["company"])
+    await manager.broadcast(message)
+    # Log
+    worker = workers_services(company_db).get_worker_by_id(user["company"], worker_id)
+    message = (
+        f"El usuario {user['userName']} ha actualizado a {worker['name']}, "
+        f"Cliente: {result['customerName']}")
+    _ = logs_services(company_db).create_log({
+        "company": user["company"],
+        "user": user["email"],
+        "userName": user["userName"],
+        "type": "Puestos",
+        "message": message
+    })
+    # Return
+    return JSONResponse(status_code=status.HTTP_200_OK, content=result)
 
 @stalls.post(
     path="/removeWorker/{stall_id}/{worker_id}",
@@ -271,4 +312,4 @@ async def remove_worker(
         "message": message
     })
     # Return
-    return result
+    return JSONResponse(status_code=status.HTTP_200_OK, content=result)

@@ -23,6 +23,10 @@ def stall_entity(stall) -> dict:
         "updatedAt": stall["updatedAt"]
     }
 
+def stalls_entity(stalls) -> dict:
+    """Stalls entity."""
+    return [stall_entity(stall) for stall in stalls]
+
 def stalls_and_shifts(stalls, shifts) -> dict:
     """Stalls and shifts entity."""
     return {

@@ -22,6 +22,8 @@ class Shift(BaseModel):
     workerName: str
     stall: str
     stallName: str
+    customer: str
+    customerName: str
     company: str = None
     month: str
     year: str
@@ -59,6 +61,10 @@ class CreateShift(BaseModel):
     workerName: str
     stall: str
     stallName: str
+    customer: str
+    customerName: str
+    month: str
+    year: str
 
 class AppliedSequence(BaseModel):
     """Applied sequence model."""
@@ -81,7 +87,7 @@ class CreateShifts(BaseModel):
 class UpdateShifts(BaseModel):
     """Update shifts model."""
     shifts: List[UpdateShift]
-    
+
 class DeleteShifts(BaseModel):
     """Delete shifts model."""
     shifts: List[str]
