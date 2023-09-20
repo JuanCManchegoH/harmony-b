@@ -67,7 +67,7 @@ class ShiftsServices():
             return shifts
         except PyMongoError as exception:
             raise Error(f"Error finding shifts by customer: {exception}") from exception
-        
+
     def get_by_customer_and_month_and_year(
         self,
         company: str,
@@ -176,3 +176,45 @@ class ShiftsServices():
             return shifts or []
         except PyMongoError as exception:
             raise Error(f"Error deleting shifts: {exception}") from exception
+
+# Updating Model (Use carefully)
+    def update_model(self) -> List[Shift]:
+        """
+        Update model.
+        Args:
+            None
+        Returns:
+            None
+        Raises:
+            Exception: If there's an error updating the model.
+        """
+        try:
+            # find all stalls
+            stalls = self.database.stalls.find({})
+            stalls = [dict(stall) for stall in stalls]
+            shifts = self.database.shifts.find({})
+            shifts = [dict(shift) for shift in shifts]
+            # For each stall
+            update_operations = []
+            print("prev")
+            for stall in stalls:
+                print("first for")
+                # For each shift
+                for shift in shifts:
+                    print("second for")
+                    # If stall id == shift stall
+                    if str(stall["_id"]) == shift["stall"]:
+                        # Update shift month and year
+                        shift["month"] = stall["month"]
+                        shift["year"] = stall["year"]
+                        # Update shift customer and customerName
+                        shift["customer"] = stall["customer"]
+                        shift["customerName"] = stall["customerName"]
+                        # Update shift
+                        update_operations.append(
+                            UpdateOne({"_id": shift["_id"]}, {"$set": shift}))
+            self.database.shifts.bulk_write(update_operations)
+            shifts = self.database.shifts.find({})
+            return shifts
+        except PyMongoError as exception:
+            raise Error(f"Error updating model: {exception}") from exception

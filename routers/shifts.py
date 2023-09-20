@@ -123,9 +123,27 @@ async def delete_shifts(
     result = shifts_services(company_db).delete_shifts(user["company"], stall_id, data.shifts)
     result = [shift_entity(shift) for shift in result]
     # Log
-    _ = logs_services(company_db).create_log({
-        "user": user["userName"],
-        "company": user["company"],
-        "action": "delete_shifts",
-        "data": data.shifts})
+    # _ = logs_services(company_db).create_log({
+    #     "user": user["userName"],
+    #     "company": user["company"],
+    #     "action": "delete_shifts",
+    #     "data": data.shifts})
     return JSONResponse(status_code=200, content=result)
+
+# UpdateModel (use carefully)
+@shifts.put(
+    path='/updateModel',
+    summary='Update shifts model',
+    description='Update shifts model',
+    status_code=200)
+async def update_shifts_model(token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Update shifts model."""
+    # Validations
+    token = decode_access_token(token)
+    allowed_roles(token["roles"], ["super_admin"])
+    # Update shifts model
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    _ = shifts_services(company_db).update_model()
+    return JSONResponse(status_code=200, content={"message": "Shifts model updated successfully."})
