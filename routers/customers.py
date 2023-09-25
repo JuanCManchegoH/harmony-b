@@ -11,7 +11,7 @@ from services.companies import CompaniesServices
 from services.customers import CustomersServices
 from services.websocket import manager
 from services.logs import LogsServices
-from models.customer import Customer, UpdateCustomer
+from models.customer import Customer, UpdateCustomer, CreateAndUpdate
 from models.websocket import WebsocketResponse
 from schemas.customer import customer_entity, customer_entity_list
 from schemas.user import user_entity
@@ -70,6 +70,32 @@ async def create_customer(customer: Customer, token: str = Depends(oauth2_scheme
     })
     # Return
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
+
+@customers.post(
+    path="/createAndUpdate",
+    summary="Create and update customers",
+    description="This endpoint creates and updates customers in the database",
+    status_code=201)
+async def create_and_update_customers(
+    data: CreateAndUpdate,
+    token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Create and update customers."""
+    # Validations
+    token = decode_access_token(token)
+    allowed_roles(token["roles"], ["handle_customers", "admin"])
+    # Encode customers
+    customers_data = jsonable_encoder(data.customers)
+    # Create and update customers
+    user = users_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    _ = customers_services(company_db).create_and_update_customers(
+        user["company"], customers_data, user_entity(user))
+    result = customers_services(company_db).get_all_customers(user["company"], user["customers"])
+    result = customer_entity_list(result)
+    # Return
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED, content=result)
 
 @customers.get(
     path="/",
@@ -168,3 +194,23 @@ async def delete_customer(customer_id: str, token: str = Depends(oauth2_scheme))
     })
     # Return
     return JSONResponse(status_code=status.HTTP_200_OK, content=result)
+
+
+# # UpdateModel (use carefully)
+# @customers.patch(
+#     path='/updateModel',
+#     summary='Update customers model',
+#     description='Update customers model',
+#     status_code=200)
+# async def update_customers_model(token: str = Depends(oauth2_scheme)) -> JSONResponse:
+#     """Update customers model."""
+#     # Validations
+#     token = decode_access_token(token)
+#     # allowed_roles(token["roles"], ["super_admin"])
+#     # Update customers model
+#     user = users_services.get_by_email(token["email"])
+#     company = companies_services.get_company(user["company"])
+#     company_db = db_client[company["db"]]
+#     _ = customers_services(company_db).update_model()
+#     # Return
+#     return JSONResponse(status_code=status.HTTP_200_OK, content="Model updated")

@@ -11,7 +11,7 @@ from services.companies import CompaniesServices
 from services.workers import WorkersServices
 from services.websocket import manager
 from services.logs import LogsServices
-from models.worker import GetByIds, Worker, UpdateWorker
+from models.worker import GetByIds, Worker, UpdateWorker, CreateAndUpdate
 from models.websocket import WebsocketResponse
 from schemas.worker import worker_entity, worker_entity_list
 from schemas.user import user_entity
@@ -67,6 +67,30 @@ async def create_worker(worker: Worker, token: str = Depends(oauth2_scheme)) -> 
     })
     # Return
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=result)
+
+@workers.post(
+    path="/createAndUpdate",
+    summary="Create and update workers",
+    description="This endpoint creates and updates workers in the database",
+    status_code=201)
+async def create_and_update_workers(
+    data: CreateAndUpdate,
+    token: str = Depends(oauth2_scheme)) -> JSONResponse:
+    """Create and update workers."""
+    print("Here")
+    # Validations
+    token = decode_access_token(token)
+    allowed_roles(token["roles"], ["handle_workers", "admin"])
+    # Encode workers
+    workers_data = jsonable_encoder(data.workers)
+    # Create workers
+    user = user_services.get_by_email(token["email"])
+    company = companies_services.get_company(user["company"])
+    company_db = db_client[company["db"]]
+    _ = workers_services(company_db).create_and_update_workers(
+        user["company"], workers_data, user_entity(user))
+    # Return
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content="Workers created")
 
 @workers.get(
     path="/{search}/{limit}/{skip}",

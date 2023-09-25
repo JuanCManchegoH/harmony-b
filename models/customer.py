@@ -31,7 +31,7 @@ class Customer(BaseModel):
     updatedBy: str = None
     createdAt: str = None
     updatedAt: str = None
-    
+
 class UpdateCustomer(BaseModel):
     """UpdateCustomer model."""
     name: str
@@ -44,4 +44,7 @@ class UpdateCustomer(BaseModel):
     tags: List[str]
     branches: List[str]
     active: bool = True
-    
+
+class CreateAndUpdate(BaseModel):
+    """CreateAndUpdate model."""
+    customers: List[Customer]

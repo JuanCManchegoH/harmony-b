@@ -6,6 +6,7 @@ import pytz
 from bson import ObjectId
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
+from pymongo import UpdateOne, InsertOne
 from models.worker import Worker, UpdateWorker
 from schemas.user import user_entity
 
@@ -36,7 +37,7 @@ class WorkersServices():
             if self.database.workers.find_one({"identification": worker["identification"]}):
                 raise Error("Worker already exists")
             worker["userName"] = user["userName"]
-            worker["updatedatabasey"] = user["userName"]
+            worker["updatedBy"] = user["userName"]
             worker["createdAt"] = datetime.datetime.now(
                 pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
             worker["updatedAt"] = datetime.datetime.now(
@@ -50,6 +51,57 @@ class WorkersServices():
             return worker
         except PyMongoError as exception:
             raise Error(f"Error creating worker: {exception}") from exception
+
+    def create_and_update_workers(
+        self,
+        company: str,
+        workers: List[Worker],
+        user: user_entity) -> List[Worker]:
+        """
+        Create workers.
+        Args:
+            company (str): Company name.
+            workers (List[Worker]): Workers data.
+            user (user_entity): User data.
+        Returns:
+            List[Worker]: Workers created.
+        Raises:
+            Error: Error creating workers.
+        """
+        try:
+            existing_workers = self.database.workers.find({})
+            existing_workers = [dict(worker) for worker in existing_workers]
+            existing_identifications = [worker["identification"] for worker in existing_workers]
+            create_operations = []
+            update_operations = []
+            for worker in workers:
+                del worker["id"]
+                worker["company"] = company
+                fields = []
+                for field in worker["fields"]:
+                    fields.append(dict(field))
+                if worker["identification"] in existing_identifications:
+                    update_operations.append(UpdateOne(
+                        {"identification": worker["identification"]},
+                        {"$set": dict(worker)}))
+                else:
+                    worker["userName"] = user["userName"]
+                    worker["updatedBy"] = user["userName"]
+                    worker["createdAt"] = datetime.datetime.now(
+                        pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+                    worker["updatedAt"] = datetime.datetime.now(
+                        pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+                    worker["fields"] = fields
+                    create_operations.append(InsertOne(dict(worker)))
+            if create_operations:
+                self.database.workers.bulk_write(create_operations)
+            if update_operations:
+                self.database.workers.bulk_write(update_operations)
+            workers = self.database.workers.find(
+                {"identification": {"$in": existing_identifications}})
+            return workers
+        except PyMongoError as exception:
+            raise Error(f"Error creating workers: {exception}") from exception
 
     def create_workers(
         self,
@@ -74,7 +126,7 @@ class WorkersServices():
                 if self.database.workers.find_one({"identification": worker["identification"]}):
                     raise Error("Worker already exists")
                 worker["userName"] = user["userName"]
-                worker["updatedatabasey"] = user["userName"]
+                worker["updatedBy"] = user["userName"]
                 worker["createdAt"] = datetime.datetime.now(
                     pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
                 worker["updatedAt"] = datetime.datetime.now(
@@ -202,7 +254,7 @@ class WorkersServices():
             data["fields"] = fields
             data["updatedAt"] = datetime.datetime.now(
                 pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
-            data["updatedatabasey"] = user["userName"]
+            data["updatedBy"] = user["userName"]
             self.database.workers.update_one({"_id": ObjectId(worker_id)}, {"$set": data})
             worker = self.database.workers.find_one({"_id": ObjectId(worker_id)})
             return worker

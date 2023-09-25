@@ -69,3 +69,7 @@ class StallsAndShifts(BaseModel):
     """Stalls and shifts model."""
     stalls: List[Stall]
     shifts: List[Shift]
+
+class CreateStalls(BaseModel):
+    """Create stalls model."""
+    stalls: List[Stall]

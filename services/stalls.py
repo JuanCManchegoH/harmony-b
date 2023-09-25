@@ -43,6 +43,32 @@ class StallsServices():
         except PyMongoError as exception:
             raise Error(f"Error creating stall: {exception}") from exception
 
+    def create_stalls(self, stalls: List[Stall], user: user_entity) -> List[Stall]:
+        """
+        Create stalls.
+        Args:
+            stalls (List[Stall]): Stalls to create.
+            user (user_entity): User.
+        Returns:
+            List[Stall]: Created stalls.
+        Raises:
+            Exception: If there's an error creating the stalls.
+        """
+        try:
+            for stall in stalls:
+                del stall["id"]
+                stall["createdBy"] = user["userName"]
+                stall["updatedBy"] = user["userName"]
+                stall["createdAt"] = datetime.datetime.now(
+                    pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+                stall["updatedAt"] = datetime.datetime.now(
+                    pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+            stalls = self.database.stalls.insert_many(stalls)
+            stalls = self.database.stalls.find({"_id": {"$in": stalls.inserted_ids}})
+            return stalls
+        except PyMongoError as exception:
+            raise Error(f"Error creating stalls: {exception}") from exception
+
     def get_stall(self, stall_id: str) -> Stall:
         """
         Find a stall.

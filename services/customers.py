@@ -6,6 +6,7 @@ import pytz
 from bson import ObjectId
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
+from pymongo import UpdateOne, InsertOne
 from models.customer import Customer, UpdateCustomer
 from schemas.user import user_entity
 
@@ -36,7 +37,7 @@ class CustomersServices():
             if self.database.customers.find_one({"identification": customer["identification"]}):
                 raise Error("Customer already exists")
             customer["userName"] = user["userName"]
-            customer["updatedatabasey"] = user["userName"]
+            customer["updatedBy"] = user["userName"]
             customer["createdAt"] = datetime.datetime.now(
                 pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
             customer["updatedAt"] = datetime.datetime.now(
@@ -50,6 +51,60 @@ class CustomersServices():
             return customer
         except PyMongoError as exception:
             raise Error(f"Error creating customer: {exception}") from exception
+
+    def create_and_update_customers(
+        self,
+        company: str,
+        customers: List[Customer],
+        user: user_entity) -> Customer:
+        """
+        Create customers.
+        Args:
+            company (str): Company name.
+            customers (List[Customer]): Customers data.
+            user (user_entity): User data.
+        Returns:
+            Customers: Customers created.
+        Raises:
+            PyMongoError
+        """
+        try:
+            existing_customers = self.database.customers.find({})
+            existing_customers = [dict(customer) for customer in existing_customers]
+            existing_identifications = [customer[
+                "identification"] for customer in existing_customers]
+            create_operations = []
+            update_operations = []
+            for customer in customers:
+                del customer["id"]
+                customer["company"] = company
+                fields = []
+                for field in customer["fields"]:
+                    fields.append(dict(field))
+                if customer["identification"] in existing_identifications:
+                    customer["updatedBy"] = user["userName"]
+                    customer["updatedAt"] = datetime.datetime.now(
+                        pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+                    customer["fields"] = fields
+                    update_operations.append(
+                        UpdateOne(
+                            {"identification": customer["identification"]}, {"$set": customer}))
+                else:
+                    customer["userName"] = user["userName"]
+                    customer["updatedBy"] = user["userName"]
+                    customer["createdAt"] = datetime.datetime.now(
+                        pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+                    customer["updatedAt"] = datetime.datetime.now(
+                        pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+                    customer["fields"] = fields
+                    create_operations.append(InsertOne(customer))
+            if create_operations:
+                self.database.customers.bulk_write(create_operations)
+            if update_operations:
+                self.database.customers.bulk_write(update_operations)
+            return True
+        except PyMongoError as exception:
+            raise Error(f"Error creating or updating customer: {exception}") from exception
 
     def get_all_customers(self, company: str, user_tags: list) -> List[Customer]:
         """
@@ -104,7 +159,7 @@ class CustomersServices():
             data["fields"] = fields
             data["updatedAt"] = datetime.datetime.now(
                 pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
-            data["updatedatabasey"] = user["userName"]
+            data["updatedBy"] = user["userName"]
             self.database.customers.update_one({"_id": ObjectId(customer_id)}, {"$set": data})
             customer = self.database.customers.find_one({"_id": ObjectId(customer_id)})
             return customer
@@ -135,3 +190,41 @@ class CustomersServices():
             return customer
         except PyMongoError as exception:
             raise Error(f"Error deleting customer: {exception}") from exception
+
+
+# Update Model
+
+    # def update_model(self) -> List[Customer]:
+    #     """Updating model"""
+    #     try:
+    #         customers = self.database.customers.find({})
+    #         customers = [dict(customer) for customer in customers]
+    #         update_operations = []
+    #         del_operations = []
+    #         for customer in customers:
+    #             plan = self.database.plans.find_one({"customer": customer["_id"]})
+    #             if len(customer["identification"]) < 7:
+    #                 customer["identification"] = "N/A"
+    #             customer["city"] = "Bogotá"
+    #             customer["contact"] = ""
+    #             customer["phone"] = ""
+    #             customer["address"] = ""
+    #             customer["fields"] = []
+    #             customer["tags"] = ["BOGOTA"]
+    #             if plan:
+    #                 plan = dict(plan)
+    #                 customer["branches"] = plan["places"]
+    #                 customer["plan"] = True
+    #             else:
+    #                 customer["branches"] = []
+    #             customer["userName"] = "Juan C Manchego"
+    #             customer["updatedBy"] = "Juan C Manchego"
+    #             customer["createdAt"] = datetime.datetime.now(
+    #                 pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+    #             customer["updatedAt"] = datetime.datetime.now(
+    #                 pytz.timezone("America/Bogota")).strftime("%d/%m/%Y %H:%M")
+    #             update_operations.append(UpdateOne({"_id": customer["_id"]}, {"$set": customer}))
+    #         self.database.customers.bulk_write(update_operations)
+    #         return True
+    #     except PyMongoError as exception:
+    #         raise Error(f"Error deleting customer: {exception}") from exception

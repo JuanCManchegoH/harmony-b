@@ -44,3 +44,7 @@ class UpdateWorker(BaseModel):
 class GetByIds(BaseModel):
     """GetByIds model."""
     ids: List[str]
+
+class CreateAndUpdate(BaseModel):
+    """CreateAndUpdate model."""
+    workers: List[Worker]

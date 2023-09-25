@@ -39,7 +39,7 @@ async def create_shifts(data: CreateShifts , token: str = Depends(oauth2_scheme)
     """Create shifts."""
     # Validations
     token = decode_access_token(token)
-    allowed_roles(token["roles"], ["admin", "manager"])
+    allowed_roles(token["roles"], ["admin", "create_shifts", "handle_shifts"])
     # Encode shifts
     shifts_to_create = jsonable_encoder(data.shifts)
     # Create shifts
@@ -68,7 +68,7 @@ async def get_shifts(
     """Get shifts."""
     # Validations
     token = decode_access_token(token)
-    allowed_roles(token["roles"], ["admin", "manager", "worker"])
+    allowed_roles(token["roles"], ["admin", "read_shifts", "handle_shifts"])
     # Get shifts
     user = users_services.get_by_email(token["email"])
     company = companies_services.get_company(user["company"])
@@ -86,7 +86,7 @@ async def update_shifts(data: UpdateShifts, token: str = Depends(oauth2_scheme))
     """Update shifts."""
     # Validations
     token = decode_access_token(token)
-    allowed_roles(token["roles"], ["admin", "manager"])
+    allowed_roles(token["roles"], ["admin", "handle_shifts"])
     # Encode shifts
     shifts_to_update = jsonable_encoder(data.shifts)
     # Update shifts
@@ -115,7 +115,7 @@ async def delete_shifts(
     """Delete shifts."""
     # Validations
     token = decode_access_token(token)
-    allowed_roles(token["roles"], ["admin", "manager"])
+    allowed_roles(token["roles"], ["admin", "handle_shifts", "handle_shifts"])
     # Delete shifts
     user = users_services.get_by_email(token["email"])
     company = companies_services.get_company(user["company"])
@@ -131,19 +131,21 @@ async def delete_shifts(
     return JSONResponse(status_code=200, content=result)
 
 # UpdateModel (use carefully)
-@shifts.put(
-    path='/updateModel',
-    summary='Update shifts model',
-    description='Update shifts model',
-    status_code=200)
-async def update_shifts_model(token: str = Depends(oauth2_scheme)) -> JSONResponse:
-    """Update shifts model."""
-    # Validations
-    token = decode_access_token(token)
-    allowed_roles(token["roles"], ["super_admin"])
-    # Update shifts model
-    user = users_services.get_by_email(token["email"])
-    company = companies_services.get_company(user["company"])
-    company_db = db_client[company["db"]]
-    _ = shifts_services(company_db).update_model()
-    return JSONResponse(status_code=200, content={"message": "Shifts model updated successfully."})
+# @shifts.put(
+#     path='/updateModel',
+#     summary='Update shifts model',
+#     description='Update shifts model',
+#     status_code=200)
+# async def update_shifts_model(token: str = Depends(oauth2_scheme)) -> JSONResponse:
+#     """Update shifts model."""
+#     print("update_shifts_model")
+#     # Validations
+#     token = decode_access_token(token)
+#     allowed_roles(token["roles"], ["super_admin"])
+#     # Update shifts model
+#     user = users_services.get_by_email(token["email"])
+#     company = companies_services.get_company(user["company"])
+#     company_db = db_client[company["db"]]
+#     _ = shifts_services(company_db).update_model()
+#     return JSONResponse(status_code=200, content={
+    # "message": "Shifts model updated successfully."})
