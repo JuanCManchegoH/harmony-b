@@ -261,7 +261,7 @@ async def update_stall_worker(
     # Log
     worker = workers_services(company_db).get_worker_by_id(user["company"], worker_id)
     message = (
-        f"El usuario {user['userName']} ha actualizado a {worker['name']}, "
+        f"El usuario {user['userName']} ha aplicado una secuencia a {worker['name']}, "
         f"Cliente: {result['customerName']}")
     _ = logs_services(company_db).create_log({
         "company": user["company"],
