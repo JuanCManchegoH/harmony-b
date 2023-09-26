@@ -27,10 +27,12 @@ class TagsServices():
         """
         try:
             tag["id"] = str(ObjectId())
-            if self.database.companies.find_one(
-                {"_id": ObjectId(company_id),
-                 "tags.name": tag["name"],
-                 "tags.scope": tag["scope"]}):
+            company = CompaniesServices(self.database).get_company(company_id)
+            company = dict(company)
+            existting_tag = next(
+                (item for item in company["tags"]
+                 if item["name"] == tag["name"] and item["scope"] == tag["scope"]), None)
+            if existting_tag:
                 raise Error("Tag already exists")
             self.database.companies.update_one({"_id": ObjectId(company_id)},
                                                {"$push": {"tags": tag}})
@@ -53,9 +55,13 @@ class TagsServices():
         """
         try:
             tag["id"] = tag_id
-            self.database.companies.update_one(
-                {"_id": ObjectId(company_id), "tags.id": tag_id},
-                {"$set": {"tags.$": tag}})
+            company = CompaniesServices(self.database).get_company(company_id)
+            company = dict(company)
+            existting_tag = next(
+                (item for item in company["tags"]
+                 if item["name"] == tag["name"] and item["scope"] == tag["scope"]), None)
+            if existting_tag:
+                raise Error("Tag already exists")
             company = CompaniesServices(self.database).get_company(company_id)
             return company
         except PyMongoError as exception:
